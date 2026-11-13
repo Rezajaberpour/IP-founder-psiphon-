@@ -1,0 +1,138 @@
+<resources>
+    <string name="app_name">ipfounder psiphon</string>
+    <string name="nav_scan">Scanner</string>
+    <string name="nav_saved">Saved IPs</string>
+    <string name="nav_settings">Settings</string>
+    <string name="cd_header_backdrop">Network scan topology backdrop</string>
+
+    <!-- Top bar & common badges -->
+    <string name="status_scanning_badge">SCANNING</string>
+    <string name="ping_failed">FAILED</string>
+    <string name="ping_ms_format">%1$d ms</string>
+    <string name="country_unknown">Unknown</string>
+    <string name="socks_port_badge">SOCKS :%1$d</string>
+
+    <!-- Scan Screen -->
+    <string name="hero_title_active">Active Clean IP</string>
+    <string name="hero_title_idle">Psiphon Clean IP Scanner</string>
+    <string name="hero_subtitle_idle">Select Akamai, Fastly, DNS, or Custom CIDR ranges, toggle IPv4/IPv6, verify TLS certificates &amp; HTTPS latency, and resolve GeoIP countries.</string>
+    <string name="cd_copy_active_ip">Copy active IP</string>
+    <string name="section_cdn_provider">CDN Provider</string>
+    <string name="section_ip_version_port">IP Version &amp; Target Port</string>
+    <string name="label_ipv4">IPv4</string>
+    <string name="label_ipv6">IPv6</string>
+    <string name="section_proxy_protocol">Proxy Protocol (HTTP / SOCKS5)</string>
+    <string name="label_http">HTTP</string>
+    <string name="label_socks5">SOCKS5</string>
+    <string name="label_target_ports">Target Port(s)</string>
+    <string name="placeholder_target_ports">443, 8443</string>
+    <string name="section_probe_method">Psiphon Probe Method</string>
+    <string name="label_custom_ranges">Custom IPv4 / IPv6 / CIDR Ranges</string>
+    <string name="placeholder_custom_ranges">23.32.0.0/24, 2a04:4e42::1</string>
+    <string name="btn_stop_scan">Stop Scan</string>
+    <string name="btn_start_scan">Start Clean IP Scan</string>
+    <string name="stat_clean_passed">Clean Passed</string>
+    <string name="stat_failed_blocked">Failed / Blocked</string>
+    <string name="live_probe_results_count">Live Probe Results (%1$d)</string>
+    <string name="probe_failed_fallback">Probe failed</string>
+
+    <!-- CDN Providers & Scan Stages -->
+    <string name="section_cdn_sources">CDN Sources (Real Psiphon Scan)</string>
+    <string name="section_proxy_sources">Live Proxy Sources</string>
+    <string name="btn_select_all_cdns">All CDNs</string>
+    <string name="provider_akamai">Akamai</string>
+    <string name="provider_fastly">Fastly</string>
+    <string name="provider_cloudflare">Cloudflare</string>
+    <string name="provider_arvancloud">ArvanCloud</string>
+    <string name="provider_gcore">Gcore</string>
+    <string name="provider_cachefly">CacheFly</string>
+    <string name="provider_cloudfront">Amazon CloudFront</string>
+    <string name="provider_dns_anycast">DNS &amp; Edge</string>
+    <string name="provider_freeproxy">FreeProxy.world</string>
+    <string name="provider_proxyscrape">ProxyScrape</string>
+    <string name="provider_custom">Custom</string>
+
+    <string name="stage_idle">Ready to Scan</string>
+    <string name="stage_collecting_ips">Collecting IPv4/IPv6 &amp; Proxy Candidates…</string>
+    <string name="stage_probing">Testing TCP, TLS Cert &amp; HTTPS Tunnel…</string>
+    <string name="stage_completed">Scan Completed</string>
+    <string name="stage_stopped">Scan Stopped</string>
+
+    <!-- FreeProxy.world, ProxyScrape & Screenshot-matched Controls -->
+    <string name="freeproxy_country_label">Proxy Source Country Filter</string>
+    <string name="freeproxy_country_all">All Countries</string>
+    <string name="freeproxy_port_label">Proxy Source Port Filter</string>
+    <string name="freeproxy_port_custom_label">Custom Port</string>
+    <string name="freeproxy_port_custom_placeholder">All (e.g. 1080)</string>
+    <string name="freeproxy_source_note">Live proxy sources: freeproxy.world &amp; proxyscrape.com (country, protocol &amp; port filter)</string>
+    <string name="btn_reset_to_auto">Reset to Auto</string>
+    <string name="btn_add_more_ips">+ Add</string>
+    <string name="btn_remove_failed">Remove Failed</string>
+    <string name="hero_method_clean_ip">Psiphon Method: Clean IP</string>
+    <string name="splash_subtitle">Psiphon Clean IP Scanner</string>
+    <string name="splash_tap_skip">Tap to skip</string>
+    <string name="msg_reset_auto">Active IP selection cleared (Auto mode)</string>
+    <string name="msg_removed_failed">Removed %1$d failed IP(s)</string>
+    <string name="msg_freeproxy_fetched">Fetched %1$d live proxy endpoint(s)</string>
+
+    <!-- Saved IPs Screen -->
+    <string name="btn_copy_clean">Copy Clean</string>
+    <string name="btn_rescan">Verify All</string>
+    <string name="cd_clear_all_saved">Clear all saved IPs</string>
+    <string name="placeholder_search_saved">Search IP, country, or CDN provider</string>
+    <string name="filter_clean_only">Clean Only</string>
+    <string name="filter_all_count">All (%1$d)</string>
+    <string name="filter_http">HTTP</string>
+    <string name="filter_socks5">SOCKS5</string>
+    <string name="filter_port_label">Port Filter</string>
+    <string name="filter_port_all">All Ports</string>
+    <string name="filter_port_input_label">Port</string>
+    <string name="empty_saved_title">No saved IPs yet</string>
+    <string name="empty_saved_subtitle">Run a scan from the Scanner tab to discover, verify, and store clean Psiphon IPv4/IPv6 endpoints.</string>
+    <string name="cd_selected_ip">Selected IP</string>
+    <string name="saved_card_port_details">Port :%1$d • %2$s • %3$s</string>
+    <string name="cd_copy_ip_port">Copy IP and port</string>
+    <string name="cd_rescan_ip">Re-scan IP</string>
+    <string name="cd_delete_ip">Delete IP</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_language_title">Language / زبان</string>
+    <string name="settings_language_subtitle">Switch app language and RTL/LTR layout</string>
+    <string name="lang_system">System</string>
+    <string name="lang_english">English</string>
+    <string name="lang_persian">فارسی</string>
+
+    <string name="settings_verification_title">Verification &amp; Port Settings</string>
+    <string name="settings_verify_tls_title">Verify TLS &amp; X.509 Certificate</string>
+    <string name="settings_verify_tls_subtitle">Performs real SSLSocket handshake &amp; checks cert validity</string>
+    <string name="settings_verify_https_title">Verify Pinned HTTPS Probe</string>
+    <string name="settings_verify_https_subtitle">Sends real HTTPS HEAD request pinned to candidate IP</string>
+    <string name="settings_sni_label">TLS SNI / Fronting Host Override</string>
+    <string name="settings_sni_placeholder">Leave blank to use provider default</string>
+    <string name="settings_socks_label">Local Psiphon SOCKS5 Port (Separate from Remote Port)</string>
+    <string name="settings_max_candidates">Max Candidates per Scan: %1$d</string>
+    <string name="settings_probe_timeout">Probe Timeout: %1$d ms</string>
+
+    <string name="settings_server_entries_title">Psiphon Server Entries (Optional)</string>
+    <string name="settings_server_entries_subtitle">Import a local server_entries.txt file via Android Storage Access Framework to extract and test server IPs in Custom mode.</string>
+    <string name="settings_server_entries_loaded">%1$d server entry IP(s) currently loaded</string>
+    <string name="btn_import_server_entries">Import server_entries.txt</string>
+
+    <string name="settings_about_title">ipfounder psiphon • Architecture &amp; License</string>
+    <string name="settings_about_description">Standalone Psiphon Clean IP Scanner inspired by the PsiphonCleanIps, PsiphonProbes, PsiphonMethods, and PsiphonRegions modules from mlmvpn/mlmvpn_android (GNU GPL v3.0), with live FreeProxy.world support.</string>
+    <string name="settings_about_pipeline">Pipeline: Candidate Collection (Akamai/Fastly/DNS/FreeProxy.world) → Dual-Stack TCP Connect → TLS &amp; X.509 Certificate Validation → Pinned-IP HTTP/HTTPS Probe → GeoIP Country &amp; Flag Lookup.</string>
+
+    <!-- Snackbar / Feedback Messages -->
+    <string name="msg_copied_value">Copied %1$s</string>
+    <string name="msg_copied_clean_count">Copied %1$d clean IP(s)</string>
+    <string name="msg_no_clean_export">No clean IPs to export</string>
+    <string name="msg_selected_ip">Selected %1$s</string>
+    <string name="msg_no_candidates">No candidate IPs matched your provider / IP version selection</string>
+    <string name="msg_scan_complete">Scan complete: %1$d clean IP(s) found</string>
+    <string name="msg_scan_stopped">Scan stopped</string>
+    <string name="msg_rescanning_single">Re-scanning %1$s…</string>
+    <string name="msg_rescan_all_complete">Re-scanned %1$d saved IP(s)</string>
+    <string name="msg_cleared_saved">Cleared saved IPs</string>
+    <string name="msg_no_ips_in_file">No IP addresses found in selected file</string>
+    <string name="msg_loaded_server_entries">Loaded %1$d server entry IP(s) into Custom scanner</string>
+</resources>

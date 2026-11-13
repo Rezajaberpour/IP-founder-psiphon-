@@ -1,0 +1,6 @@
+{
+  "name": "ipfounder psiphon",
+  "description": "Standalone Psiphon Clean IP Scanner supporting IPv4/IPv6, Akamai & Fastly CDNs, TLS certificate verification, HTTPS probing, and GeoIP country detection.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

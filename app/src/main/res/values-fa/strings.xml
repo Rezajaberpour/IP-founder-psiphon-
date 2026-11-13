@@ -1,0 +1,138 @@
+<resources>
+    <string name="app_name">ipfounder psiphon</string>
+    <string name="nav_scan">اسکنر</string>
+    <string name="nav_saved">ذخیره‌شده‌ها</string>
+    <string name="nav_settings">تنظیمات</string>
+    <string name="cd_header_backdrop">پس‌زمینه شبکه اسکن</string>
+
+    <!-- Top bar & common badges -->
+    <string name="status_scanning_badge">در حال اسکن</string>
+    <string name="ping_failed">ناموفق</string>
+    <string name="ping_ms_format">%1$d ms</string>
+    <string name="country_unknown">نامشخص</string>
+    <string name="socks_port_badge">SOCKS :%1$d</string>
+
+    <!-- Scan Screen -->
+    <string name="hero_title_active">IP تمیز فعال</string>
+    <string name="hero_title_idle">اسکنر IP تمیز سایفون</string>
+    <string name="hero_subtitle_idle">ارائه‌دهنده Akamai، Fastly، DNS یا رنج دلخواه را انتخاب کنید، IPv4/IPv6 را تنظیم کرده و با بررسی گواهی TLS و پینگ HTTPS، کشور هر IP را شناسایی کنید.</string>
+    <string name="cd_copy_active_ip">کپی IP فعال</string>
+    <string name="section_cdn_provider">ارائه‌دهنده CDN</string>
+    <string name="section_ip_version_port">نسخه IP و پورت مقصد</string>
+    <string name="label_ipv4">IPv4</string>
+    <string name="label_ipv6">IPv6</string>
+    <string name="section_proxy_protocol">نوع پروتکل (HTTP / SOCKS5)</string>
+    <string name="label_http">HTTP</string>
+    <string name="label_socks5">SOCKS5</string>
+    <string name="label_target_ports">پورت(های) مقصد</string>
+    <string name="placeholder_target_ports">443, 8443</string>
+    <string name="section_probe_method">روش اتصال سایفون</string>
+    <string name="label_custom_ranges">رنج‌های دلخواه IPv4 / IPv6 / CIDR</string>
+    <string name="placeholder_custom_ranges">23.32.0.0/24, 2a04:4e42::1</string>
+    <string name="btn_stop_scan">توقف اسکن</string>
+    <string name="btn_start_scan">شروع اسکن IP تمیز</string>
+    <string name="stat_clean_passed">تأیید شده (تمیز)</string>
+    <string name="stat_failed_blocked">ناموفق / مسدود</string>
+    <string name="live_probe_results_count">نتایج زنده اسکن (%1$d)</string>
+    <string name="probe_failed_fallback">تست ناموفق بود</string>
+
+    <!-- CDN Providers & Scan Stages -->
+    <string name="section_cdn_sources">منابع CDN (اسکن واقعی Psiphon)</string>
+    <string name="section_proxy_sources">منابع پروکسی زنده</string>
+    <string name="btn_select_all_cdns">همه CDNها</string>
+    <string name="provider_akamai">Akamai</string>
+    <string name="provider_fastly">Fastly</string>
+    <string name="provider_cloudflare">Cloudflare</string>
+    <string name="provider_arvancloud">ArvanCloud</string>
+    <string name="provider_gcore">Gcore</string>
+    <string name="provider_cachefly">CacheFly</string>
+    <string name="provider_cloudfront">Amazon CloudFront</string>
+    <string name="provider_dns_anycast">DNS و لبه</string>
+    <string name="provider_freeproxy">Free Proxy World</string>
+    <string name="provider_proxyscrape">ProxyScrape</string>
+    <string name="provider_custom">دلخواه</string>
+
+    <string name="stage_idle">آماده برای اسکن</string>
+    <string name="stage_collecting_ips">در حال جمع‌آوری IPv4/IPv6 و پروکسی‌های زنده…</string>
+    <string name="stage_probing">در حال تست TCP، گواهی TLS و تونل HTTPS…</string>
+    <string name="stage_completed">اسکن تکمیل شد</string>
+    <string name="stage_stopped">اسکن متوقف شد</string>
+
+    <!-- FreeProxy.world, ProxyScrape & Screenshot-matched Controls -->
+    <string name="freeproxy_country_label">کشور فیلتر منبع پروکسی</string>
+    <string name="freeproxy_country_all">همه کشورها</string>
+    <string name="freeproxy_port_label">فیلتر پورت منبع پروکسی</string>
+    <string name="freeproxy_port_custom_label">پورت دلخواه</string>
+    <string name="freeproxy_port_custom_placeholder">همه (مثلاً 1080)</string>
+    <string name="freeproxy_source_note">منابع زنده: Free Proxy World و ProxyScrape (فیلتر کشور، پروتکل و پورت)</string>
+    <string name="btn_reset_to_auto">برگشت به خودکار</string>
+    <string name="btn_add_more_ips">+ افزودن</string>
+    <string name="btn_remove_failed">حذف خراب‌ها</string>
+    <string name="hero_method_clean_ip">روش اتصال سایفون: آی‌پی تمیز</string>
+    <string name="splash_subtitle">اسکنر آی‌پی تمیز سایفون</string>
+    <string name="splash_tap_skip">برای رد کردن لمس کنید</string>
+    <string name="msg_reset_auto">انتخاب IP پاک شد (حالت خودکار)</string>
+    <string name="msg_removed_failed">%1$d آدرس خراب حذف شد</string>
+    <string name="msg_freeproxy_fetched">%1$d آدرس از منابع پروکسی زنده دریافت شد</string>
+
+    <!-- Saved IPs Screen -->
+    <string name="btn_copy_clean">کپی تمیزها</string>
+    <string name="btn_rescan">سنجش واقعی همه</string>
+    <string name="cd_clear_all_saved">پاک کردن همه IPهای ذخیره‌شده</string>
+    <string name="placeholder_search_saved">جست‌وجوی IP، کشور یا ارائه‌دهنده CDN</string>
+    <string name="filter_clean_only">فقط تمیزها</string>
+    <string name="filter_all_count">همه (%1$d)</string>
+    <string name="filter_http">HTTP</string>
+    <string name="filter_socks5">SOCKS5</string>
+    <string name="filter_port_label">فیلتر پورت</string>
+    <string name="filter_port_all">همه پورت‌ها</string>
+    <string name="filter_port_input_label">پورت</string>
+    <string name="empty_saved_title">هنوز IP ذخیره‌شده‌ای نیست</string>
+    <string name="empty_saved_subtitle">از تب اسکنر یک اسکن اجرا کنید تا آدرس‌های تمیز IPv4 و IPv6 سایفون شناسایی و ذخیره شوند.</string>
+    <string name="cd_selected_ip">IP انتخاب‌شده</string>
+    <string name="saved_card_port_details">پورت :%1$d • %2$s • %3$s</string>
+    <string name="cd_copy_ip_port">کپی IP و پورت</string>
+    <string name="cd_rescan_ip">اسکن مجدد IP</string>
+    <string name="cd_delete_ip">حذف IP</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_language_title">زبان / Language</string>
+    <string name="settings_language_subtitle">تغییر زبان برنامه و چیدمان راست‌به‌چپ (RTL) یا چپ‌به‌راست</string>
+    <string name="lang_system">پیش‌فرض سیستم</string>
+    <string name="lang_english">English</string>
+    <string name="lang_persian">فارسی</string>
+
+    <string name="settings_verification_title">تنظیمات بررسی و پورت</string>
+    <string name="settings_verify_tls_title">تأیید TLS و گواهی X.509</string>
+    <string name="settings_verify_tls_subtitle">انجام هندشیک واقعی SSLSocket و بررسی اعتبار گواهی</string>
+    <string name="settings_verify_https_title">تأیید درخواست HTTPS مستقیم</string>
+    <string name="settings_verify_https_subtitle">ارسال درخواست واقعی HTTPS HEAD روی IP کاندید</string>
+    <string name="settings_sni_label">میزبان SNI / دامنه Fronting</string>
+    <string name="settings_sni_placeholder">برای پیش‌فرض ارائه‌دهنده خالی بگذارید</string>
+    <string name="settings_socks_label">پورت محلی SOCKS5 سایفون (جدا از پورت مقصد)</string>
+    <string name="settings_max_candidates">حداکثر IP کاندید در هر اسکن: %1$d</string>
+    <string name="settings_probe_timeout">زمان انتظار (Timeout): %1$d میلی‌ثانیه</string>
+
+    <string name="settings_server_entries_title">فایل سرورهای سایفون (اختیاری)</string>
+    <string name="settings_server_entries_subtitle">فایل محلی server_entries.txt را از طریق ابزار فایل اندروید وارد کنید تا آدرس‌های IP استخراج و در حالت دلخواه تست شوند.</string>
+    <string name="settings_server_entries_loaded">%1$d آدرس IP از فایل سرورها بارگذاری شده است</string>
+    <string name="btn_import_server_entries">وارد کردن server_entries.txt</string>
+
+    <string name="settings_about_title">ipfounder psiphon • معماری و مجوز</string>
+    <string name="settings_about_description">اسکنر مستقل آی‌پی تمیز سایفون برگرفته از ماژول‌های PsiphonCleanIps، PsiphonProbes، PsiphonMethods و PsiphonRegions از مخزن mlmvpn/mlmvpn_android (مجوز GNU GPL v3.0) به‌همراه منبع زنده FreeProxy.world.</string>
+    <string name="settings_about_pipeline">مراحل بررسی: جمع‌آوری از اکامای/فستلی/DNS/FreeProxy.world ← اتصال دوگانه TCP ← بررسی TLS و گواهی X.509 ← درخواست مستقیم HTTP/HTTPS ← شناسایی کشور و پرچم GeoIP.</string>
+
+    <!-- Snackbar / Feedback Messages -->
+    <string name="msg_copied_value">کپی شد: %1$s</string>
+    <string name="msg_copied_clean_count">%1$d آدرس IP تمیز کپی شد</string>
+    <string name="msg_no_clean_export">هیچ IP تمیزی برای خروجی وجود ندارد</string>
+    <string name="msg_selected_ip">انتخاب شد: %1$s</string>
+    <string name="msg_no_candidates">هیچ IP کاندیدی مطابق فیلتر ارائه‌دهنده یا نسخه IP پیدا نشد</string>
+    <string name="msg_scan_complete">اسکن تکمیل شد: %1$d آی‌پی تمیز پیدا شد</string>
+    <string name="msg_scan_stopped">اسکن متوقف شد</string>
+    <string name="msg_rescanning_single">در حال اسکن مجدد %1$s…</string>
+    <string name="msg_rescan_all_complete">%1$d آدرس IP ذخیره‌شده مجدداً اسکن شد</string>
+    <string name="msg_cleared_saved">تمام IPهای ذخیره‌شده پاک شد</string>
+    <string name="msg_no_ips_in_file">هیچ آدرس IP در فایل انتخاب‌شده یافت نشد</string>
+    <string name="msg_loaded_server_entries">%1$d آدرس IP در اسکنر دلخواه بارگذاری شد</string>
+</resources>
