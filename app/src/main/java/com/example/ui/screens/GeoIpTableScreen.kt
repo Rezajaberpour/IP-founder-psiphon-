@@ -12,18 +12,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Public
@@ -37,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,7 +54,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.local.CleanIpEntity
@@ -68,6 +68,14 @@ import com.example.ui.theme.EmeraldShield
 import com.example.ui.theme.VioletStudio
 import java.util.Locale
 
+enum class GeoIpSortColumn {
+    ANONYMITY,
+    COUNTRY,
+    CITY,
+    ISP,
+    PING
+}
+
 data class GeoIpTableRow(
     val idKey: String,
     val ip: String,
@@ -80,69 +88,50 @@ data class GeoIpTableRow(
     val isp: String,
     val anonymityConfidenceScore: Int,
     val pingMs: Long?,
-    val isClean: Boolean,
-    val provider: String
+    val isClean: Boolean
 )
-
-enum class GeoIpSortColumn {
-    ANONYMITY,
-    COUNTRY,
-    CITY,
-    ISP,
-    PING
-}
 
 fun buildGeoIpTableRows(
     liveResults: List<ProbeTelemetry>,
-    savedIps: List<CleanIpEntity>,
-    locale: Locale = Locale.ENGLISH
+    savedIps: List<CleanIpEntity>
 ): List<GeoIpTableRow> {
-    val merged = linkedMapOf<String, GeoIpTableRow>()
-
-    liveResults.forEach { r ->
-        val idKey = "${r.ip}:${r.targetPort}:${r.proxyProtocol}"
-        val localizedCountry = if (r.countryCode == "--") r.countryName
-        else PsiphonRegions.resolveDisplayName(r.countryCode, locale)
-        merged[idKey] = GeoIpTableRow(
+    val map = linkedMapOf<String, GeoIpTableRow>()
+    liveResults.forEach { t ->
+        val idKey = "${t.ip}:${t.targetPort}:${t.proxyProtocol}"
+        map[idKey] = GeoIpTableRow(
             idKey = idKey,
-            ip = r.ip,
-            targetPort = r.targetPort,
-            proxyProtocol = r.proxyProtocol,
-            countryCode = r.countryCode,
-            countryName = localizedCountry,
-            countryFlag = r.countryFlag,
-            city = r.city.ifBlank { "Unknown" },
-            isp = r.isp.ifBlank { r.provider.displayName },
-            anonymityConfidenceScore = r.anonymityConfidenceScore,
-            pingMs = r.httpsPingMs ?: r.tcpPingMs,
-            isClean = r.isClean,
-            provider = r.provider.displayName
+            ip = t.ip,
+            targetPort = t.targetPort,
+            proxyProtocol = t.proxyProtocol,
+            countryCode = t.countryCode,
+            countryName = t.countryName,
+            countryFlag = t.countryFlag,
+            city = t.city.ifBlank { "Unknown" },
+            isp = t.isp.ifBlank { t.provider.displayName },
+            anonymityConfidenceScore = t.anonymityConfidenceScore,
+            pingMs = t.httpsPingMs ?: t.tcpPingMs,
+            isClean = t.isClean
         )
     }
-
     savedIps.forEach { e ->
-        if (e.idKey !in merged) {
-            val localizedCountry = if (e.countryCode == "--") e.countryName
-            else PsiphonRegions.resolveDisplayName(e.countryCode, locale)
-            merged[e.idKey] = GeoIpTableRow(
+        if (!map.containsKey(e.idKey)) {
+            map[e.idKey] = GeoIpTableRow(
                 idKey = e.idKey,
                 ip = e.ip,
                 targetPort = e.targetPort,
                 proxyProtocol = e.proxyProtocol,
                 countryCode = e.countryCode,
-                countryName = localizedCountry,
+                countryName = e.countryName,
                 countryFlag = e.countryFlag,
                 city = e.city.ifBlank { "Unknown" },
                 isp = e.isp.ifBlank { e.provider },
                 anonymityConfidenceScore = e.anonymityConfidenceScore,
                 pingMs = e.httpsPingMs ?: e.tcpPingMs,
-                isClean = e.isClean,
-                provider = e.provider
+                isClean = e.isClean
             )
         }
     }
-
-    return merged.values.toList()
+    return map.values.toList()
 }
 
 fun filterAndSortGeoIpRows(
@@ -150,9 +139,10 @@ fun filterAndSortGeoIpRows(
     query: String,
     filterMode: String,
     sortColumn: GeoIpSortColumn,
-    sortDescending: Boolean
+    sortDescending: Boolean,
+    locale: Locale = Locale.ENGLISH
 ): List<GeoIpTableRow> {
-    val q = query.trim()
+    val trimmed = query.trim()
     val filtered = rows.filter { row ->
         val matchesMode = when (filterMode) {
             "CLEAN" -> row.isClean
@@ -160,35 +150,26 @@ fun filterAndSortGeoIpRows(
             "SOCKS5" -> row.proxyProtocol.equals("SOCKS5", ignoreCase = true)
             else -> true
         }
-        val matchesQuery = q.isBlank() ||
-            row.ip.contains(q, ignoreCase = true) ||
-            row.targetPort.toString().contains(q, ignoreCase = true) ||
-            row.countryName.contains(q, ignoreCase = true) ||
-            row.countryCode.contains(q, ignoreCase = true) ||
-            row.city.contains(q, ignoreCase = true) ||
-            row.isp.contains(q, ignoreCase = true) ||
-            row.provider.contains(q, ignoreCase = true) ||
-            row.proxyProtocol.contains(q, ignoreCase = true)
+        val localizedCountry = if (row.countryCode == "--") "" else PsiphonRegions.resolveDisplayName(row.countryCode, locale)
+        val matchesQuery = trimmed.isBlank() ||
+            row.ip.contains(trimmed, ignoreCase = true) ||
+            row.targetPort.toString().contains(trimmed, ignoreCase = true) ||
+            row.countryCode.contains(trimmed, ignoreCase = true) ||
+            row.countryName.contains(trimmed, ignoreCase = true) ||
+            localizedCountry.contains(trimmed, ignoreCase = true) ||
+            row.city.contains(trimmed, ignoreCase = true) ||
+            row.isp.contains(trimmed, ignoreCase = true)
         matchesMode && matchesQuery
     }
 
-    val comparator: Comparator<GeoIpTableRow> = when (sortColumn) {
+    val comparator = when (sortColumn) {
         GeoIpSortColumn.ANONYMITY -> compareBy<GeoIpTableRow> { it.anonymityConfidenceScore }
-            .thenByDescending { it.pingMs ?: Long.MAX_VALUE }
         GeoIpSortColumn.COUNTRY -> compareBy<GeoIpTableRow> { it.countryName.lowercase(Locale.US) }
-            .thenBy { it.city.lowercase(Locale.US) }
         GeoIpSortColumn.CITY -> compareBy<GeoIpTableRow> { it.city.lowercase(Locale.US) }
-            .thenBy { it.countryName.lowercase(Locale.US) }
         GeoIpSortColumn.ISP -> compareBy<GeoIpTableRow> { it.isp.lowercase(Locale.US) }
-            .thenByDescending { it.anonymityConfidenceScore }
-        GeoIpSortColumn.PING -> compareBy<GeoIpTableRow> { -(it.pingMs ?: Long.MAX_VALUE) }
+        GeoIpSortColumn.PING -> compareBy<GeoIpTableRow> { it.pingMs ?: Long.MAX_VALUE }
     }
-
-    return if (sortDescending) {
-        filtered.sortedWith(comparator.reversed())
-    } else {
-        filtered.sortedWith(comparator)
-    }
+    return if (sortDescending) filtered.sortedWith(comparator.reversed()) else filtered.sortedWith(comparator)
 }
 
 @Composable
@@ -205,29 +186,25 @@ fun GeoIpTableScreen(
     val activeLocale = LocalConfiguration.current.locales[0] ?: Locale.ENGLISH
 
     var searchQuery by remember { mutableStateOf("") }
-    var filterMode by remember { mutableStateOf("ALL") } // ALL, CLEAN, HTTP, SOCKS5
+    var filterMode by remember { mutableStateOf("ALL") }
     var sortColumn by remember { mutableStateOf(GeoIpSortColumn.ANONYMITY) }
     var sortDescending by remember { mutableStateOf(true) }
 
-    val allRows = remember(liveResults, savedIps, activeLocale) {
-        buildGeoIpTableRows(liveResults, savedIps, activeLocale)
+    val allRows = remember(liveResults, savedIps) {
+        buildGeoIpTableRows(liveResults = liveResults, savedIps = savedIps)
     }
-
-    val displayedRows = remember(allRows, searchQuery, filterMode, sortColumn, sortDescending) {
+    val displayedRows = remember(allRows, searchQuery, filterMode, sortColumn, sortDescending, activeLocale) {
         filterAndSortGeoIpRows(
             rows = allRows,
             query = searchQuery,
             filterMode = filterMode,
             sortColumn = sortColumn,
-            sortDescending = sortDescending
+            sortDescending = sortDescending,
+            locale = activeLocale
         )
     }
-
-    val uniqueCountries = remember(displayedRows) {
-        displayedRows.map { it.countryCode }.filter { it != "--" }.distinct().size
-    }
-    val avgAnon = remember(displayedRows) {
-        if (displayedRows.isEmpty()) 0 else displayedRows.sumOf { it.anonymityConfidenceScore } / displayedRows.size
+    val distinctCountries = remember(allRows) {
+        allRows.map { it.countryCode }.filter { it != "--" && it.isNotBlank() }.distinct().size
     }
 
     val pillChipColors = FilterChipDefaults.filterChipColors(
@@ -236,17 +213,6 @@ fun GeoIpTableScreen(
         selectedContainerColor = ElectricCyan,
         selectedLabelColor = Color.White
     )
-
-    val horizontalTableScroll = rememberScrollState()
-
-    fun onHeaderClick(col: GeoIpSortColumn) {
-        if (sortColumn == col) {
-            sortDescending = !sortDescending
-        } else {
-            sortColumn = col
-            sortDescending = col == GeoIpSortColumn.ANONYMITY
-        }
-    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -298,13 +264,7 @@ fun GeoIpTableScreen(
                         )
                         TelemetryStatCard(
                             label = stringResource(R.string.geoip_stat_countries),
-                            value = "$uniqueCountries",
-                            accent = VioletStudio,
-                            modifier = Modifier.weight(1f)
-                        )
-                        TelemetryStatCard(
-                            label = stringResource(R.string.ai_stat_anon_confidence),
-                            value = if (displayedRows.isEmpty()) "--" else "$avgAnon%",
+                            value = "$distinctCountries",
                             accent = EmeraldShield,
                             modifier = Modifier.weight(1f)
                         )
@@ -315,21 +275,24 @@ fun GeoIpTableScreen(
                         onValueChange = { searchQuery = it },
                         placeholder = { Text(stringResource(R.string.geoip_search_placeholder)) },
                         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = "" }) {
+                        trailingIcon = if (searchQuery.isNotEmpty()) {
+                            {
+                                IconButton(
+                                    onClick = { searchQuery = "" },
+                                    modifier = Modifier.minimumInteractiveComponentSize()
+                                ) {
                                     Icon(
-                                        imageVector = Icons.Filled.Clear,
+                                        Icons.Filled.Clear,
                                         contentDescription = stringResource(R.string.cd_clear_search)
                                     )
                                 }
                             }
-                        },
+                        } else null,
                         singleLine = true,
                         shape = MaterialTheme.shapes.medium,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("geoip_table_search_input")
+                            .testTag("geoip_search_input")
                     )
 
                     Row(
@@ -339,16 +302,15 @@ fun GeoIpTableScreen(
                         listOf(
                             "ALL" to stringResource(R.string.filter_all_count, allRows.size),
                             "CLEAN" to stringResource(R.string.filter_clean_only),
-                            "SOCKS5" to stringResource(R.string.filter_socks5),
-                            "HTTP" to stringResource(R.string.filter_http)
+                            "HTTP" to stringResource(R.string.filter_http),
+                            "SOCKS5" to stringResource(R.string.filter_socks5)
                         ).forEach { (key, label) ->
                             FilterChip(
                                 selected = filterMode == key,
                                 onClick = { filterMode = key },
                                 label = { Text(label) },
                                 shape = CircleShape,
-                                colors = pillChipColors,
-                                modifier = Modifier.testTag("geoip_filter_${key.lowercase()}")
+                                colors = pillChipColors
                             )
                         }
                     }
@@ -356,185 +318,214 @@ fun GeoIpTableScreen(
             }
         }
 
-        if (displayedRows.isEmpty()) {
-            item {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = MaterialTheme.shapes.large,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.geoip_empty_title),
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = stringResource(R.string.geoip_empty_subtitle),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        } else {
-            // Table Header Card
-            item {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                ) {
+        // Scrollable Sortable Data Table Header
+        item {
+            val hScroll = rememberScrollState()
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(horizontalTableScroll)
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                            .horizontalScroll(hScroll)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TableStaticHeaderCell(
-                            label = stringResource(R.string.geoip_col_ip),
-                            width = 168.dp
+                        Text(
+                            text = stringResource(R.string.geoip_col_ip),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = ElectricCyan,
+                            modifier = Modifier.width(156.dp)
                         )
-                        TableSortHeaderCell(
+                        SortableHeaderCell(
                             label = stringResource(R.string.geoip_col_country),
-                            width = 148.dp,
                             active = sortColumn == GeoIpSortColumn.COUNTRY,
                             descending = sortDescending,
-                            onClick = { onHeaderClick(GeoIpSortColumn.COUNTRY) }
+                            onClick = {
+                                if (sortColumn == GeoIpSortColumn.COUNTRY) sortDescending = !sortDescending
+                                else {
+                                    sortColumn = GeoIpSortColumn.COUNTRY
+                                    sortDescending = false
+                                }
+                            },
+                            modifier = Modifier.width(136.dp)
                         )
-                        TableSortHeaderCell(
+                        SortableHeaderCell(
                             label = stringResource(R.string.geoip_col_city),
-                            width = 124.dp,
                             active = sortColumn == GeoIpSortColumn.CITY,
                             descending = sortDescending,
-                            onClick = { onHeaderClick(GeoIpSortColumn.CITY) }
+                            onClick = {
+                                if (sortColumn == GeoIpSortColumn.CITY) sortDescending = !sortDescending
+                                else {
+                                    sortColumn = GeoIpSortColumn.CITY
+                                    sortDescending = false
+                                }
+                            },
+                            modifier = Modifier.width(116.dp)
                         )
-                        TableSortHeaderCell(
+                        SortableHeaderCell(
                             label = stringResource(R.string.geoip_col_isp),
-                            width = 156.dp,
                             active = sortColumn == GeoIpSortColumn.ISP,
                             descending = sortDescending,
-                            onClick = { onHeaderClick(GeoIpSortColumn.ISP) }
+                            onClick = {
+                                if (sortColumn == GeoIpSortColumn.ISP) sortDescending = !sortDescending
+                                else {
+                                    sortColumn = GeoIpSortColumn.ISP
+                                    sortDescending = false
+                                }
+                            },
+                            modifier = Modifier.width(156.dp)
                         )
-                        TableSortHeaderCell(
+                        SortableHeaderCell(
                             label = stringResource(R.string.geoip_col_anonymity),
-                            width = 112.dp,
                             active = sortColumn == GeoIpSortColumn.ANONYMITY,
                             descending = sortDescending,
-                            onClick = { onHeaderClick(GeoIpSortColumn.ANONYMITY) }
+                            onClick = {
+                                if (sortColumn == GeoIpSortColumn.ANONYMITY) sortDescending = !sortDescending
+                                else {
+                                    sortColumn = GeoIpSortColumn.ANONYMITY
+                                    sortDescending = true
+                                }
+                            },
+                            modifier = Modifier.width(118.dp)
                         )
-                        TableSortHeaderCell(
+                        SortableHeaderCell(
                             label = stringResource(R.string.geoip_col_ping),
-                            width = 104.dp,
                             active = sortColumn == GeoIpSortColumn.PING,
                             descending = sortDescending,
-                            onClick = { onHeaderClick(GeoIpSortColumn.PING) }
-                        )
-                        Spacer(modifier = Modifier.width(48.dp))
-                    }
-                }
-            }
-
-            itemsIndexed(displayedRows, key = { _, row -> row.idKey }) { idx, row ->
-                val isSelected = row.idKey == selectedIpKey
-                val rowBg = when {
-                    isSelected -> ElectricCyan.copy(alpha = 0.12f)
-                    idx % 2 == 0 -> MaterialTheme.colorScheme.surfaceContainer
-                    else -> MaterialTheme.colorScheme.surfaceContainerLow
-                }
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(rowBg)
-                        .clickable { if (row.isClean) onSelectIp(row.idKey) }
-                        .testTag("geoip_row_${row.idKey}")
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(horizontalTableScroll)
-                            .heightIn(min = 52.dp)
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.width(168.dp)) {
-                            Text(
-                                text = "\u2066${row.ip}:${row.targetPort}\u2069",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = if (isSelected) ElectricCyan else MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.size(2.dp))
-                            ProtocolBadge(row.proxyProtocol)
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .width(148.dp)
-                                .padding(end = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(text = row.countryFlag, style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                text = "${row.countryName} (${row.countryCode})",
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        Text(
-                            text = row.city,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .width(124.dp)
-                                .padding(end = 8.dp)
-                        )
-
-                        Text(
-                            text = row.isp,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .width(156.dp)
-                                .padding(end = 8.dp)
-                        )
-
-                        Box(modifier = Modifier.width(112.dp)) {
-                            AnonymityConfidenceBadge(confidenceScore = row.anonymityConfidenceScore)
-                        }
-
-                        Box(modifier = Modifier.width(104.dp)) {
-                            PingBadge(pingMs = row.pingMs, isClean = row.isClean)
-                        }
-
-                        IconButton(
                             onClick = {
-                                val endpoint = "${row.ip}:${row.targetPort}"
-                                clipboard.setText(AnnotatedString(endpoint))
-                                onCopyFeedback(context.getString(R.string.msg_copied_value, endpoint))
-                            }
+                                if (sortColumn == GeoIpSortColumn.PING) sortDescending = !sortDescending
+                                else {
+                                    sortColumn = GeoIpSortColumn.PING
+                                    sortDescending = false
+                                }
+                            },
+                            modifier = Modifier.width(104.dp)
+                        )
+                    }
+
+                    if (displayedRows.isEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.ContentCopy,
-                                contentDescription = stringResource(R.string.cd_copy_ip_port),
-                                modifier = Modifier.size(18.dp)
+                            Text(
+                                text = stringResource(R.string.geoip_empty_title),
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.geoip_empty_subtitle),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    } else {
+                        displayedRows.forEachIndexed { idx, row ->
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            val isSelected = row.idKey == selectedIpKey
+                            val countryLabel = if (row.countryCode == "--") {
+                                stringResource(R.string.country_unknown)
+                            } else {
+                                PsiphonRegions.resolveDisplayName(row.countryCode, activeLocale)
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(hScroll)
+                                    .clickable { if (row.isClean) onSelectIp(row.idKey) }
+                                    .background(
+                                        if (isSelected) EmeraldShield.copy(alpha = 0.10f)
+                                        else if (idx % 2 == 0) MaterialTheme.colorScheme.surfaceContainer
+                                        else MaterialTheme.colorScheme.surfaceContainerLow
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                                    .testTag("geoip_row_${row.idKey}"),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    modifier = Modifier.width(156.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            if (isSelected) {
+                                                Icon(
+                                                    Icons.Filled.CheckCircle,
+                                                    contentDescription = stringResource(R.string.cd_selected_ip),
+                                                    tint = EmeraldShield,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                            }
+                                            Text(
+                                                text = "\u2066${row.ip}:${row.targetPort}\u2069",
+                                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        ProtocolBadge(protocol = row.proxyProtocol)
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            val value = "${row.ip}:${row.targetPort}"
+                                            clipboard.setText(AnnotatedString(value))
+                                            onCopyFeedback(context.getString(R.string.msg_copied_value, value))
+                                        },
+                                        modifier = Modifier.minimumInteractiveComponentSize()
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.ContentCopy,
+                                            contentDescription = stringResource(R.string.cd_copy_ip_port),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = "${row.countryFlag} $countryLabel",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.width(136.dp).padding(end = 6.dp)
+                                )
+
+                                Text(
+                                    text = row.city,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.width(116.dp).padding(end = 6.dp)
+                                )
+
+                                Text(
+                                    text = row.isp,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = VioletStudio,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.width(156.dp).padding(end = 6.dp)
+                                )
+
+                                Box(modifier = Modifier.width(118.dp)) {
+                                    AnonymityConfidenceBadge(confidenceScore = row.anonymityConfidenceScore)
+                                }
+
+                                Box(modifier = Modifier.width(104.dp)) {
+                                    PingBadge(pingMs = row.pingMs, isClean = row.isClean)
+                                }
+                            }
+                        }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                 }
             }
         }
@@ -542,56 +533,33 @@ fun GeoIpTableScreen(
 }
 
 @Composable
-private fun TableStaticHeaderCell(
+private fun SortableHeaderCell(
     label: String,
-    width: Dp
-) {
-    Box(
-        modifier = Modifier
-            .width(width)
-            .heightIn(min = 48.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun TableSortHeaderCell(
-    label: String,
-    width: Dp,
     active: Boolean,
     descending: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier
-            .width(width)
-            .heightIn(min = 48.dp)
+        modifier = modifier
             .clickable(onClick = onClick)
             .padding(end = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
             color = if (active) ElectricCyan else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false)
+            overflow = TextOverflow.Ellipsis
         )
         if (active) {
             Icon(
-                imageVector = if (descending) Icons.Filled.ArrowDropDown else Icons.Filled.ArrowDropUp,
+                imageVector = if (descending) Icons.Filled.ArrowDownward else Icons.Filled.ArrowUpward,
                 contentDescription = null,
                 tint = ElectricCyan,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(14.dp)
             )
         }
     }

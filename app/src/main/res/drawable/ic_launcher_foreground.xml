@@ -1,8 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="66dp"
-        android:height="66dp"
-        android:drawable="@drawable/app_icon_fg_1794563361174"
-        android:gravity="center" />
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Subtle Outer Radar Pulse Ring (within 66dp safe zone [21..87]) -->
+    <path
+        android:pathData="M54,23.5 A30.5,30.5 0 1,0 54,84.5 A30.5,30.5 0 1,0 54,23.5 Z"
+        android:strokeAlpha="0.32"
+        android:strokeColor="#EC2922"
+        android:strokeWidth="1.2" />
+
+    <!-- Subtle Inner Cyan Pulse Ring -->
+    <path
+        android:pathData="M54,28.8 A25.2,25.2 0 1,0 54,79.2 A25.2,25.2 0 1,0 54,28.8 Z"
+        android:strokeAlpha="0.28"
+        android:strokeColor="#22D3EE"
+        android:strokeWidth="1.0" />
+
+    <!-- Orbital Scanner Arc 1: Electric Cyan (Top-Right, -62 deg to +12 deg, r=27.8) -->
+    <path
+        android:pathData="M67.05,29.45 A27.8,27.8 0 0,1 81.19,59.78"
+        android:strokeAlpha="0.92"
+        android:strokeColor="#22D3EE"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.5" />
+
+    <!-- Orbital Scanner Arc 2: Psiphon Crimson (Bottom-Left, 118 deg to 192 deg, r=27.8) -->
+    <path
+        android:pathData="M40.95,78.55 A27.8,27.8 0 0,1 26.81,48.22"
+        android:strokeAlpha="0.92"
+        android:strokeColor="#EC2922"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.5" />
+
+    <!-- Central Crimson Shield Circle (r=19.5, centered at 54,54) -->
+    <path android:pathData="M54,34.5 A19.5,19.5 0 1,0 54,73.5 A19.5,19.5 0 1,0 54,34.5 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="73.5"
+                android:endY="73.5"
+                android:startX="34.5"
+                android:startY="34.5"
+                android:type="linear">
+                <item android:color="#FFFF4D43" android:offset="0.0" />
+                <item android:color="#FFEC2922" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Stylized Geometric White "P" Tunnel Emblem: Vertical Stem -->
+    <path
+        android:pathData="M49.32,62.19 L49.32,45.81"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="4.29" />
+
+    <!-- Stylized Geometric White "P" Tunnel Emblem: Rounded Tunnel Loop -->
+    <path
+        android:pathData="M49.32,45.81 L55.56,45.81 C63.36,45.81 63.36,54.78 55.56,54.78 L49.32,54.78"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="3.90" />
+</vector>

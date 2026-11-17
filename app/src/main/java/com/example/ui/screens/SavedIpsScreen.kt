@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
@@ -36,9 +37,8 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -107,7 +107,7 @@ fun SavedIpsScreen(
         onImportFromUri = onImportEncryptedBackup
     )
     var searchQuery by remember { mutableStateOf("") }
-    var filterMode by remember { mutableStateOf("CLEAN") } // ALL, CLEAN, HTTP, SOCKS5, IPV4, IPV6
+    var filterMode by remember { mutableStateOf("CLEAN") }
     var portFilterInput by remember { mutableStateOf("") }
 
     val availablePorts = remember(savedIps) {
@@ -159,7 +159,6 @@ fun SavedIpsScreen(
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                // Grouped Verify All / Remove Failed Card (matches screenshot 2)
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainer,
                     shape = RoundedCornerShape(18.dp),

@@ -30,12 +30,10 @@ class LanguageSwitchUiTest {
         composeRule.onNodeWithTag("nav_tab_settings").performClick()
         composeRule.waitForIdle()
 
-        // Switch to Persian (RTL)
         composeRule.onNodeWithTag("lang_chip_persian").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("اسکنر").assertIsDisplayed()
 
-        // Navigate across all tabs in Persian
         composeRule.onNodeWithTag("nav_tab_scanner").performClick()
         composeRule.waitForIdle()
 
@@ -51,7 +49,6 @@ class LanguageSwitchUiTest {
         composeRule.onNodeWithTag("nav_tab_settings").performClick()
         composeRule.waitForIdle()
 
-        // Switch back to English and System without crashing
         composeRule.onNodeWithTag("lang_chip_english").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Scanner").assertIsDisplayed()

@@ -4,48 +4,58 @@ import android.app.Service
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.net.Inet6Address
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
-import java.net.SocketTimeoutException
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SNIHostName
+import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLParameters
 import javax.net.ssl.SSLSocket
-import javax.net.ssl.SSLSocketFactory
-
-/**
- * Isolated Probe Service mirroring PsiphonProbes.kt separation so runtime probing
- * remains decoupled from the UI lifecycle.
- */
-class PsiphonProbeService : Service() {
-
-    inner class LocalBinder : Binder() {
-        fun getService(): PsiphonProbeService = this@PsiphonProbeService
-    }
-
-    private val binder = LocalBinder()
-    val prober = PsiphonProbes()
-
-    override fun onBind(intent: Intent?): IBinder = binder
-}
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
+import kotlin.math.roundToInt
 
 class PsiphonProbes {
 
     val sharedClient: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(4, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.SECONDS)
-        .writeTimeout(4, TimeUnit.SECONDS)
+        .connectTimeout(3500, TimeUnit.MILLISECONDS)
+        .readTimeout(3500, TimeUnit.MILLISECONDS)
+        .writeTimeout(3500, TimeUnit.MILLISECONDS)
+        .followRedirects(false)
         .build()
 
-    suspend fun probeCandidate(
+    fun parseServerEntries(raw: String): List<String> {
+        if (raw.isBlank()) return emptyList()
+        val found = linkedSetOf<String>()
+        val ipv4Regex = Regex("""\b(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(?:\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)){3}\b""")
+        val hexCandidateRegex = Regex("""\b[0-9a-fA-F]{16,}\b""")
+
+        ipv4Regex.findAll(raw).forEach { found.add(it.value) }
+
+        hexCandidateRegex.findAll(raw).forEach { match ->
+            val hex = match.value
+            if (hex.length % 2 == 0) {
+                try {
+                    val decoded = hex.chunked(2)
+                        .map { it.toInt(16).toByte() }
+                        .toByteArray()
+                        .toString(Charsets.UTF_8)
+                    ipv4Regex.findAll(decoded).forEach { found.add(it.value) }
+                } catch (_: Exception) {
+                }
+            }
+        }
+        return found.toList()
+    }
+
+    fun probeCandidate(
         ip: String,
         targetPort: Int,
         localSocksPort: Int,
@@ -57,167 +67,32 @@ class PsiphonProbes {
         verifyHttpsTunnel: Boolean,
         countryHint: String? = null,
         proxyProtocol: String = "HTTP"
-    ): ProbeTelemetry = withContext(Dispatchers.IO) {
+    ): ProbeTelemetry {
         val cleanIp = ip.trim().trim('[', ']')
         val ipVersion = if (cleanIp.contains(":")) "IPv6" else "IPv4"
+        val effectiveTimeout = timeoutMs.coerceIn(800, 10_000)
         val effectiveSni = sniHost.trim().ifBlank { provider.defaultSni }
-        val normalizedProtocol = if (proxyProtocol.equals("SOCKS5", ignoreCase = true)) "SOCKS5" else "HTTP"
 
-        // Step 1: Real dual-stack TCP connect
-        val socket = Socket()
-        val tcpStartNs = System.nanoTime()
-        val tcpPingMs: Long
-        var tlsVersion = if (normalizedProtocol == "SOCKS5") "SOCKS5" else "TCP"
-        var certIssuer = "None"
-        var certValid = false
-
-        try {
-            val addr = InetAddress.getByName(cleanIp)
-            socket.connect(InetSocketAddress(addr, targetPort), timeoutMs)
-            tcpPingMs = ((System.nanoTime() - tcpStartNs) / 1_000_000L).coerceAtLeast(1L)
-
-            if (normalizedProtocol == "SOCKS5") {
-                try {
-                    socket.soTimeout = timeoutMs
-                    val out = socket.getOutputStream()
-                    val inp = socket.getInputStream()
-                    // SOCKS5 greeting: VER=5, NMETHODS=1, METHOD=0x00 (No Auth)
-                    out.write(byteArrayOf(0x05, 0x01, 0x00))
-                    out.flush()
-                    val reply = ByteArray(2)
-                    val read = inp.read(reply)
-                    socket.close()
-                    if (read < 2 || reply[0] != 0x05.toByte()) {
-                        return@withContext ProbeTelemetry(
-                            ip = cleanIp,
-                            ipVersion = ipVersion,
-                            targetPort = targetPort,
-                            localSocksPort = localSocksPort,
-                            proxyProtocol = "SOCKS5",
-                            provider = provider,
-                            method = method,
-                            tcpPingMs = tcpPingMs,
-                            httpsPingMs = null,
-                            tlsVersion = "SOCKS5-Failed",
-                            certIssuer = "InvalidGreeting",
-                            certValid = false,
-                            httpsStatusCode = null,
-                            countryCode = "--",
-                            countryName = "Unknown",
-                            countryFlag = "🌐",
-                            isClean = false,
-                            failureReason = "Not SOCKS5"
-                        )
-                    }
-                    if (reply[1] == 0xFF.toByte() || reply[1] != 0x00.toByte()) {
-                        return@withContext ProbeTelemetry(
-                            ip = cleanIp,
-                            ipVersion = ipVersion,
-                            targetPort = targetPort,
-                            localSocksPort = localSocksPort,
-                            proxyProtocol = "SOCKS5",
-                            provider = provider,
-                            method = method,
-                            tcpPingMs = tcpPingMs,
-                            httpsPingMs = null,
-                            tlsVersion = "SOCKS5-Auth",
-                            certIssuer = "AuthRequired",
-                            certValid = false,
-                            httpsStatusCode = null,
-                            countryCode = "--",
-                            countryName = "Unknown",
-                            countryFlag = "🌐",
-                            isClean = false,
-                            failureReason = "SOCKS5 auth required"
-                        )
-                    }
-                    tlsVersion = "SOCKS5"
-                    certValid = true
-                } catch (socksEx: Exception) {
-                    try { socket.close() } catch (_: Exception) {}
-                    return@withContext ProbeTelemetry(
-                        ip = cleanIp,
-                        ipVersion = ipVersion,
-                        targetPort = targetPort,
-                        localSocksPort = localSocksPort,
-                        proxyProtocol = "SOCKS5",
-                        provider = provider,
-                        method = method,
-                        tcpPingMs = tcpPingMs,
-                        httpsPingMs = null,
-                        tlsVersion = "SOCKS5-Failed",
-                        certIssuer = socksEx.javaClass.simpleName,
-                        certValid = false,
-                        httpsStatusCode = null,
-                        countryCode = "--",
-                        countryName = "Unknown",
-                        countryFlag = "🌐",
-                        isClean = false,
-                        failureReason = "SOCKS5: ${socksEx.localizedMessage ?: socksEx.javaClass.simpleName}"
-                    )
-                }
-            } else {
-                // Step 2: Real TLS handshake & X.509 certificate verification (HTTP/HTTPS endpoints)
-                val shouldAttemptTls = verifyTls && (targetPort == 443 || targetPort == 8443 || targetPort == 2053 || targetPort == 2083)
-                if (shouldAttemptTls) {
-                    try {
-                        val factory = SSLSocketFactory.getDefault() as SSLSocketFactory
-                        val sslSocket = factory.createSocket(socket, effectiveSni, targetPort, true) as SSLSocket
-                        sslSocket.soTimeout = timeoutMs
-                        val params: SSLParameters = sslSocket.sslParameters
-                        if (effectiveSni.isNotBlank() && !isIpLiteral(effectiveSni)) {
-                            params.serverNames = listOf(SNIHostName(effectiveSni))
-                        }
-                        sslSocket.sslParameters = params
-                        sslSocket.startHandshake()
-
-                        tlsVersion = sslSocket.session.protocol ?: "TLS"
-                        val certs = sslSocket.session.peerCertificates
-                        val x509 = certs.firstOrNull() as? X509Certificate
-                        if (x509 != null) {
-                            x509.checkValidity()
-                            certIssuer = extractOrgOrCn(x509.issuerX500Principal.name)
-                            certValid = true
-                        }
-                        sslSocket.close()
-                    } catch (tlsEx: Exception) {
-                        try {
-                            socket.close()
-                        } catch (_: Exception) {
-                        }
-                        return@withContext ProbeTelemetry(
-                            ip = cleanIp,
-                            ipVersion = ipVersion,
-                            targetPort = targetPort,
-                            localSocksPort = localSocksPort,
-                            proxyProtocol = "HTTP",
-                            provider = provider,
-                            method = method,
-                            tcpPingMs = tcpPingMs,
-                            httpsPingMs = null,
-                            tlsVersion = "TLS-Failed",
-                            certIssuer = tlsEx.javaClass.simpleName,
-                            certValid = false,
-                            httpsStatusCode = null,
-                            countryCode = "--",
-                            countryName = "Unknown",
-                            countryFlag = "🌐",
-                            isClean = false,
-                            failureReason = "TLS: ${tlsEx.localizedMessage ?: tlsEx.javaClass.simpleName}"
-                        )
-                    }
-                } else {
-                    socket.close()
-                }
+        // 1. TCP Connect Probe
+        val tcpStart = System.nanoTime()
+        val tcpOk = try {
+            Socket().use { sock ->
+                sock.connect(InetSocketAddress(InetAddress.getByName(cleanIp), targetPort), effectiveTimeout)
+                true
             }
-        } catch (_: SocketTimeoutException) {
-            try { socket.close() } catch (_: Exception) {}
-            return@withContext ProbeTelemetry(
+        } catch (_: Exception) {
+            false
+        }
+        val tcpPingMs = if (tcpOk) ((System.nanoTime() - tcpStart) / 1_000_000L).coerceAtLeast(1L) else null
+
+        if (!tcpOk) {
+            val geo = PsiphonRegions.lookupGeoIp(cleanIp, sharedClient, countryHint, provider)
+            return ProbeTelemetry(
                 ip = cleanIp,
                 ipVersion = ipVersion,
                 targetPort = targetPort,
                 localSocksPort = localSocksPort,
-                proxyProtocol = normalizedProtocol,
+                proxyProtocol = proxyProtocol,
                 provider = provider,
                 method = method,
                 tcpPingMs = null,
@@ -226,167 +101,214 @@ class PsiphonProbes {
                 certIssuer = "",
                 certValid = false,
                 httpsStatusCode = null,
-                countryCode = "--",
-                countryName = "Unknown",
-                countryFlag = "🌐",
+                countryCode = geo.code,
+                countryName = geo.name,
+                countryFlag = geo.flag,
+                city = geo.city,
+                isp = geo.isp,
                 isClean = false,
-                failureReason = "Timeout (${timeoutMs}ms)"
-            )
-        } catch (ex: Exception) {
-            try { socket.close() } catch (_: Exception) {}
-            return@withContext ProbeTelemetry(
-                ip = cleanIp,
-                ipVersion = ipVersion,
-                targetPort = targetPort,
-                localSocksPort = localSocksPort,
-                proxyProtocol = normalizedProtocol,
-                provider = provider,
-                method = method,
-                tcpPingMs = null,
-                httpsPingMs = null,
-                tlsVersion = "",
-                certIssuer = "",
-                certValid = false,
-                httpsStatusCode = null,
-                countryCode = "--",
-                countryName = "Unknown",
-                countryFlag = "🌐",
-                isClean = false,
-                failureReason = ex.localizedMessage ?: "Unreachable"
+                failureReason = "TCP timeout"
             )
         }
 
-        // Step 3: Pinned-IP HTTP/HTTPS verification (HTTP protocol only)
-        var httpsPingMs: Long? = null
+        // 2. Branch for SOCKS5 Proxy Handshake vs TLS/HTTPS CDN Edge Verification
+        val isSocks5 = proxyProtocol.equals("SOCKS5", ignoreCase = true)
+        var tlsVersion = if (isSocks5) "SOCKS5" else "TCP"
+        var certIssuer = if (isSocks5) "SOCKS5 Proxy" else "None"
+        var certValid = !verifyTls || isSocks5
         var httpsStatusCode: Int? = null
-        var httpsError: String? = null
-        val supportsHttpProbe = normalizedProtocol == "HTTP" &&
-            targetPort in setOf(443, 8443, 2053, 2083, 80, 8080, 8880)
+        var httpsPingMs: Long? = tcpPingMs
+        var isClean = true
+        var failureReason: String? = null
 
-        if (verifyHttpsTunnel && supportsHttpProbe) {
-            val isPlainHttp = targetPort in setOf(80, 8080, 8880)
-            val scheme = if (isPlainHttp) "http" else "https"
-            val pinnedDns = object : Dns {
-                override fun lookup(hostname: String): List<InetAddress> {
-                    return listOf(InetAddress.getByName(cleanIp))
+        if (isSocks5) {
+            val socksStart = System.nanoTime()
+            val socksResult = verifySocks5Greeting(cleanIp, targetPort, effectiveTimeout)
+            httpsPingMs = ((System.nanoTime() - socksStart) / 1_000_000L).coerceAtLeast(1L)
+            if (!socksResult.first) {
+                isClean = false
+                failureReason = socksResult.second ?: "SOCKS5 handshake rejected"
+            }
+        } else {
+            val expectsTls = verifyTls && targetPort !in setOf(80, 8080, 3128)
+            if (expectsTls) {
+                val tlsInfo = performTlsHandshake(cleanIp, targetPort, effectiveSni, effectiveTimeout)
+                if (tlsInfo.success) {
+                    tlsVersion = tlsInfo.protocol.ifBlank { "TLSv1.3" }
+                    certIssuer = tlsInfo.issuer
+                    certValid = tlsInfo.certValid
+                    httpsPingMs = tlsInfo.rttMs
+                } else {
+                    isClean = false
+                    certValid = false
+                    tlsVersion = "TLS-ERR"
+                    failureReason = tlsInfo.error ?: "TLS handshake failed"
                 }
             }
-            val pinnedClient = sharedClient.newBuilder()
-                .dns(pinnedDns)
-                .connectTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
-                .readTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
-                .followRedirects(false)
-                .build()
 
-            val probeUrl = "$scheme://$effectiveSni:$targetPort/"
-            try {
-                val reqStartNs = System.nanoTime()
-                val req = Request.Builder()
-                    .url(probeUrl)
-                    .head()
-                    .header("User-Agent", "ipfounder-psiphon/1.0")
-                    .build()
-                pinnedClient.newCall(req).execute().use { resp ->
-                    httpsPingMs = ((System.nanoTime() - reqStartNs) / 1_000_000L).coerceAtLeast(1L)
-                    httpsStatusCode = resp.code
+            if (isClean && verifyHttpsTunnel) {
+                val scheme = if (targetPort in setOf(80, 8080, 3128)) "http" else "https"
+                val httpRes = performPinnedHeadRequest(cleanIp, targetPort, effectiveSni, scheme, effectiveTimeout)
+                if (httpRes.first != null) {
+                    httpsStatusCode = httpRes.first
+                    httpsPingMs = httpRes.second
+                    if (!expectsTls && scheme == "http") tlsVersion = "HTTP"
+                } else {
+                    isClean = false
+                    failureReason = httpRes.third ?: "Pinned tunnel probe failed"
                 }
-            } catch (ex: Exception) {
-                httpsError = ex.localizedMessage ?: ex.javaClass.simpleName
             }
         }
 
-        // Step 4: GeoIP Country, City & ISP lookup (with countryHint & cert/provider fallback)
-        val fallbackIsp = certIssuer.takeIf {
-            it.isNotBlank() && it != "None" && it != "Verified"
-        } ?: provider.displayName
-        val lookedUp = PsiphonRegions.lookupCountry(
-            ip = cleanIp,
-            client = sharedClient,
-            fallbackIsp = fallbackIsp
-        )
-        val country = if (lookedUp.code == "--" && !countryHint.isNullOrBlank() && countryHint.length == 2) {
-            val code = countryHint.uppercase()
-            GeoIpCountry(
-                code = code,
-                name = PsiphonRegions.resolveDisplayName(code),
-                flag = PsiphonRegions.countryCodeToFlag(code),
-                city = lookedUp.city,
-                isp = lookedUp.isp
-            )
-        } else {
-            lookedUp
-        }
-
-        val passed = if (verifyHttpsTunnel && supportsHttpProbe && !provider.isProxyListSource) {
-            httpsStatusCode != null
-        } else {
-            true
-        }
-
-        ProbeTelemetry(
+        val geo = PsiphonRegions.lookupGeoIp(cleanIp, sharedClient, countryHint, provider)
+        return ProbeTelemetry(
             ip = cleanIp,
             ipVersion = ipVersion,
             targetPort = targetPort,
             localSocksPort = localSocksPort,
-            proxyProtocol = normalizedProtocol,
+            proxyProtocol = proxyProtocol,
             provider = provider,
             method = method,
             tcpPingMs = tcpPingMs,
-            httpsPingMs = httpsPingMs ?: tcpPingMs,
+            httpsPingMs = httpsPingMs,
             tlsVersion = tlsVersion,
             certIssuer = certIssuer,
             certValid = certValid,
             httpsStatusCode = httpsStatusCode,
-            countryCode = country.code,
-            countryName = country.name,
-            countryFlag = country.flag,
-            city = country.city,
-            isp = country.isp,
-            isClean = passed,
-            failureReason = if (!passed) httpsError else null
+            countryCode = geo.code,
+            countryName = geo.name,
+            countryFlag = geo.flag,
+            city = geo.city,
+            isp = geo.isp,
+            isClean = isClean,
+            failureReason = failureReason
         )
     }
 
-    /**
-     * Parses imported Psiphon server_entries.txt lines (plain host:port or hex-encoded entries)
-     * into candidate IP/host targets.
-     */
-    fun parseServerEntries(rawContent: String): List<String> {
-        val candidates = linkedSetOf<String>()
-        val ipRegex = Regex("""(\d{1,3}(?:\.\d{1,3}){3})""")
-        rawContent.lines().forEach { line ->
-            val trimmed = line.trim()
-            if (trimmed.isEmpty() || trimmed.startsWith("#")) return@forEach
-            // Extract IPv4 literals directly if present
-            ipRegex.findAll(trimmed).forEach { match ->
-                candidates.add(match.value)
-            }
-            // Attempt hex-decode of Psiphon server_entry lines if purely hex
-            if (trimmed.length > 32 && trimmed.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) {
-                try {
-                    val decoded = trimmed.chunked(2)
-                        .map { it.toInt(16).toByte() }
-                        .toByteArray()
-                        .toString(Charsets.UTF_8)
-                    ipRegex.findAll(decoded).forEach { match ->
-                        candidates.add(match.value)
-                    }
-                } catch (_: Exception) {
+    private fun verifySocks5Greeting(ip: String, port: Int, timeoutMs: Int): Pair<Boolean, String?> {
+        return try {
+            Socket().use { sock ->
+                sock.soTimeout = timeoutMs
+                sock.connect(InetSocketAddress(InetAddress.getByName(ip), port), timeoutMs)
+                val out = DataOutputStream(sock.getOutputStream())
+                val inp = DataInputStream(sock.getInputStream())
+                // SOCKS5 version=5, 1 auth method, 0x00 (No Authentication)
+                out.write(byteArrayOf(0x05, 0x01, 0x00))
+                out.flush()
+                val reply = ByteArray(2)
+                inp.readFully(reply)
+                if (reply[0] == 0x05.toByte() && reply[1] != 0xFF.toByte()) {
+                    true to null
+                } else {
+                    false to "SOCKS5 auth rejected"
                 }
             }
+        } catch (e: Exception) {
+            false to (e.message?.take(42) ?: "SOCKS5 timeout")
         }
-        return candidates.toList()
     }
 
-    private fun extractOrgOrCn(dn: String): String {
-        val parts = dn.split(",").map { it.trim() }
-        val org = parts.firstOrNull { it.startsWith("O=", ignoreCase = true) }?.substringAfter("=")
-        val cn = parts.firstOrNull { it.startsWith("CN=", ignoreCase = true) }?.substringAfter("=")
-        return (org ?: cn ?: "Verified").take(26)
+    private data class TlsProbeResult(
+        val success: Boolean,
+        val protocol: String = "",
+        val issuer: String = "",
+        val certValid: Boolean = false,
+        val rttMs: Long = 0L,
+        val error: String? = null
+    )
+
+    private fun performTlsHandshake(ip: String, port: Int, sniHost: String, timeoutMs: Int): TlsProbeResult {
+        val startNs = System.nanoTime()
+        return try {
+            val trustAll = arrayOf<TrustManager>(object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+                override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+                override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+            })
+            val sslContext = SSLContext.getInstance("TLS")
+            sslContext.init(null, trustAll, null)
+
+            Socket().use { rawSocket ->
+                rawSocket.soTimeout = timeoutMs
+                rawSocket.connect(InetSocketAddress(InetAddress.getByName(ip), port), timeoutMs)
+                val sslSocket = sslContext.socketFactory.createSocket(rawSocket, sniHost, port, true) as SSLSocket
+                sslSocket.soTimeout = timeoutMs
+                if (sniHost.isNotBlank()) {
+                    val params: SSLParameters = sslSocket.sslParameters
+                    params.serverNames = listOf(SNIHostName(sniHost))
+                    sslSocket.sslParameters = params
+                }
+                sslSocket.startHandshake()
+                val session = sslSocket.session
+                val certs = session.peerCertificates
+                val firstX509 = certs.firstOrNull() as? X509Certificate
+                val validDates = try {
+                    firstX509?.checkValidity()
+                    firstX509 != null
+                } catch (_: Exception) {
+                    false
+                }
+                val issuerCn = firstX509?.issuerX500Principal?.name
+                    ?.substringAfter("O=", "")
+                    ?.substringBefore(",")
+                    ?.ifBlank { firstX509.issuerX500Principal.name.take(28) }
+                    ?: "Verified"
+                val rtt = ((System.nanoTime() - startNs) / 1_000_000L).coerceAtLeast(1L)
+                TlsProbeResult(
+                    success = true,
+                    protocol = session.protocol ?: "TLSv1.3",
+                    issuer = issuerCn,
+                    certValid = validDates,
+                    rttMs = rtt
+                )
+            }
+        } catch (e: Exception) {
+            TlsProbeResult(success = false, error = e.message?.take(48) ?: "TLS error")
+        }
     }
 
-    private fun isIpLiteral(value: String): Boolean {
-        val ipv4 = Regex("^\\d{1,3}(\\.\\d{1,3}){3}$")
-        return ipv4.matches(value) || value.contains(":")
+    private fun performPinnedHeadRequest(
+        ip: String,
+        port: Int,
+        sniHost: String,
+        scheme: String,
+        timeoutMs: Int
+    ): Triple<Int?, Long?, String?> {
+        val targetAddress = InetAddress.getByName(ip)
+        val pinnedDns = object : Dns {
+            override fun lookup(hostname: String): List<InetAddress> = listOf(targetAddress)
+        }
+        val client = sharedClient.newBuilder()
+            .dns(pinnedDns)
+            .connectTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            .readTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            .build()
+        val url = "$scheme://$sniHost:$port/"
+        val req = Request.Builder()
+            .url(url)
+            .head()
+            .header("User-Agent", "PsiphonCleanScanner/1.0")
+            .build()
+        val startNs = System.nanoTime()
+        return try {
+            client.newCall(req).execute().use { resp ->
+                val rtt = ((System.nanoTime() - startNs) / 1_000_000L).coerceAtLeast(1L)
+                Triple(resp.code, rtt, null)
+            }
+        } catch (e: Exception) {
+            Triple(null, null, e.message?.take(48) ?: "HTTP tunnel timeout")
+        }
     }
+}
+
+class PsiphonProbeService : Service() {
+
+    inner class LocalBinder : Binder() {
+        fun getService(): PsiphonProbeService = this@PsiphonProbeService
+    }
+
+    private val binder = LocalBinder()
+    val prober: PsiphonProbes by lazy { PsiphonProbes() }
+
+    override fun onBind(intent: Intent?): IBinder = binder
 }

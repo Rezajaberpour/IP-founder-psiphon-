@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Orbital Scanner Arcs -->
+    <path
+        android:pathData="M67.05,29.45 A27.8,27.8 0 0,1 81.19,59.78"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.5" />
+
+    <path
+        android:pathData="M40.95,78.55 A27.8,27.8 0 0,1 26.81,48.22"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.5" />
+
+    <!-- Shield Outline Ring -->
+    <path
+        android:pathData="M54,34.5 A19.5,19.5 0 1,0 54,73.5 A19.5,19.5 0 1,0 54,34.5 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.4" />
+
+    <!-- Geometric "P" Tunnel Glyph -->
+    <path
+        android:pathData="M49.32,62.19 L49.32,45.81"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="4.29" />
+
+    <path
+        android:pathData="M49.32,45.81 L55.56,45.81 C63.36,45.81 63.36,54.78 55.56,54.78 L49.32,54.78"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="3.90" />
+</vector>

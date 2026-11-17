@@ -2,48 +2,49 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Psiphon + Clean-IP Screenshot Dark Palette
-val ObsidianBg = Color(0xFF0E0E10)
-val PsiphonWarmTop = Color(0xFF1D1311)
-val MidnightSurface = Color(0xFF18181B)
-val MidnightSurfaceElevated = Color(0xFF202024)
-val MidnightSurfaceHigh = Color(0xFF2A2A2F)
-val MidnightOutline = Color(0xFF38383E)
-val MidnightOutlineSubtle = Color(0xFF2C2C31)
+// Dark Obsidian & Neon Shield Palette
+val ObsidianBg = Color(0xFF0A0E17)
+val MidnightSurface = Color(0xFF101726)
+val MidnightSurfaceElevated = Color(0xFF161F33)
+val MidnightSurfaceHigh = Color(0xFF1E2942)
+val MidnightOutline = Color(0xFF2B3A55)
+val MidnightOutlineSubtle = Color(0xFF1E2A40)
 
-// Psiphon Signature Crimson & Active Pill Blue (matches screenshots)
-val PsiphonCrimson = Color(0xFFE53935)
-val PsiphonCrimsonContainer = Color(0xFF3D1414)
-val ElectricCyan = Color(0xFF0A84FF) // Active pill & link blue from screenshots
-val ElectricCyanContainer = Color(0xFF0B2D52)
-val OnElectricCyan = Color(0xFFFFFFFF)
+val TextPrimaryDark = Color(0xFFF1F5F9)
+val TextSecondaryDark = Color(0xFF94A3B8)
 
-// Verified Clean Emerald Green (matches green broom/text/latency in screenshots)
-val EmeraldShield = Color(0xFF30D158)
-val EmeraldContainer = Color(0xFF11351C)
-val OnEmerald = Color(0xFF00210B)
+// Electric Cyan Primary
+val ElectricCyan = Color(0xFF22D3EE)
+val OnElectricCyan = Color(0xFF042630)
+val ElectricCyanContainer = Color(0xFF0E3A4A)
 
-// IPv6 Accent & Warnings
-val VioletStudio = Color(0xFF64D2FF)
-val VioletContainer = Color(0xFF132E3D)
+// Emerald Shield Secondary
+val EmeraldShield = Color(0xFF10B981)
+val OnEmerald = Color(0xFF022C22)
+val EmeraldContainer = Color(0xFF064E3B)
 
-val AmberLatency = Color(0xFFFF9F0A)
-val AmberContainer = Color(0xFF3A2506)
+// Psiphon Crimson Accent & Warm Splash Backdrop
+val PsiphonCrimson = Color(0xFFEC2922)
+val PsiphonCrimsonContainer = Color(0xFF4A1214)
+val PsiphonWarmTop = Color(0xFF1B1014)
 
-val CoralError = Color(0xFFFF453A)
-val CoralContainer = Color(0xFF3D1414)
+// Status & AI Telemetry Accents
+val CoralError = Color(0xFFF43F5E)
+val CoralContainer = Color(0xFF4C1120)
+val AmberLatency = Color(0xFFF59E0B)
+val AmberContainer = Color(0xFF452A07)
+val VioletStudio = Color(0xFFA78BFA)
+val VioletContainer = Color(0xFF2E1E59)
 
-val TextPrimaryDark = Color(0xFFF5F5F7)
-val TextSecondaryDark = Color(0xFF9E9EA7)
+// Light Theme Fallbacks
+val DeepCyanPrimary = Color(0xFF0891B2)
+val DeepCyanContainer = Color(0xFFCFFAFE)
+val DeepEmeraldSecondary = Color(0xFF059669)
+val DeepEmeraldContainer = Color(0xFFD1FAE5)
+val DeepVioletTertiary = Color(0xFF7C3AED)
+val DeepVioletContainer = Color(0xFFEDE9FE)
 
-// Light Theme Counterparts
-val LightBg = Color(0xFFF5F5F7)
+val LightBg = Color(0xFFF8FAFC)
 val LightSurface = Color(0xFFFFFFFF)
-val LightSurfaceVariant = Color(0xFFE9E9EE)
-val LightOutline = Color(0xFFD1D1D6)
-val DeepCyanPrimary = Color(0xFF007AFF)
-val DeepCyanContainer = Color(0xFFD6EAFF)
-val DeepEmeraldSecondary = Color(0xFF248A3D)
-val DeepEmeraldContainer = Color(0xFFC8F7D4)
-val DeepVioletTertiary = Color(0xFFD70015)
-val DeepVioletContainer = Color(0xFFFFDAD6)
+val LightSurfaceVariant = Color(0xFFF1F5F9)
+val LightOutline = Color(0xFFCBD5E1)
