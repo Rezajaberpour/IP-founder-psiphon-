@@ -22,6 +22,15 @@ data class CleanIpEntity(
     val countryCode: String,
     val countryName: String,
     val countryFlag: String,
+    val city: String = "Unknown",
+    val isp: String = "Unknown",
     val isClean: Boolean,
+    val aiScore: Int = 0,
+    val fuzzyMembership: Float = 0f,
+    val nnPrediction: Float = 0f,
+    val nashPayoff: Float = 0f,
+    val anonymityConfidenceScore: Int = 0,
+    val proxyHealthScore: Int = 0,
+    val aiVerdict: String = "MODERATE",
     val scannedAt: Long = System.currentTimeMillis()
 )

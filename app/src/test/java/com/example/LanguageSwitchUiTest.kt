@@ -42,6 +42,12 @@ class LanguageSwitchUiTest {
         composeRule.onNodeWithTag("nav_tab_saved").performClick()
         composeRule.waitForIdle()
 
+        composeRule.onNodeWithTag("nav_tab_geoip").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("nav_tab_cf_diag").performClick()
+        composeRule.waitForIdle()
+
         composeRule.onNodeWithTag("nav_tab_settings").performClick()
         composeRule.waitForIdle()
 

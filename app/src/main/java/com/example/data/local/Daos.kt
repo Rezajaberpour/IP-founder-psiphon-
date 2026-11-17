@@ -8,11 +8,14 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CleanIpDao {
-    @Query("SELECT * FROM clean_ips ORDER BY isClean DESC, CASE WHEN httpsPingMs IS NULL THEN 999999 ELSE httpsPingMs END ASC, scannedAt DESC")
+    @Query("SELECT * FROM clean_ips ORDER BY isClean DESC, aiScore DESC, CASE WHEN httpsPingMs IS NULL THEN 999999 ELSE httpsPingMs END ASC, scannedAt DESC")
     fun observeAllCleanIps(): Flow<List<CleanIpEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertCleanIp(entity: CleanIpEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAllCleanIps(entities: List<CleanIpEntity>)
 
     @Query("DELETE FROM clean_ips WHERE idKey = :idKey")
     suspend fun deleteById(idKey: String)

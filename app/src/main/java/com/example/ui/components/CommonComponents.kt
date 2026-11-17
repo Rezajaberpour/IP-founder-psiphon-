@@ -157,3 +157,60 @@ fun TelemetryStatCard(
         }
     }
 }
+
+@Composable
+fun AiScoreBadge(
+    aiScore: Int,
+    aiVerdict: String,
+    modifier: Modifier = Modifier
+) {
+    val (bg, fg) = when {
+        aiVerdict.equals("OPTIMAL", ignoreCase = true) || aiScore >= 82 -> EmeraldContainer to EmeraldShield
+        aiVerdict.equals("RESILIENT", ignoreCase = true) || aiScore >= 64 -> ElectricCyanContainer to ElectricCyan
+        aiVerdict.equals("MODERATE", ignoreCase = true) || aiScore >= 42 -> AmberContainer to AmberLatency
+        else -> CoralContainer to CoralError
+    }
+
+    Surface(
+        modifier = modifier,
+        color = bg,
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, fg.copy(alpha = 0.4f))
+    ) {
+        Text(
+            text = "AI $aiScore",
+            color = fg,
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+        )
+    }
+}
+
+@Composable
+fun AnonymityConfidenceBadge(
+    confidenceScore: Int,
+    modifier: Modifier = Modifier
+) {
+    val (bg, fg) = when {
+        confidenceScore >= 80 -> EmeraldContainer to EmeraldShield
+        confidenceScore >= 60 -> ElectricCyanContainer to ElectricCyan
+        confidenceScore >= 40 -> AmberContainer to AmberLatency
+        else -> CoralContainer to CoralError
+    }
+
+    Surface(
+        modifier = modifier,
+        color = bg,
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, fg.copy(alpha = 0.4f))
+    ) {
+        Text(
+            text = stringResource(R.string.anonymity_badge_format, confidenceScore),
+            color = fg,
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+        )
+    }
+}

@@ -30,6 +30,10 @@
         <service
             android:name=".psiphon.PsiphonProbeService"
             android:exported="false" />
+
+        <service
+            android:name=".psiphon.AdaptiveRoutingService"
+            android:exported="false" />
     </application>
 
 </manifest>

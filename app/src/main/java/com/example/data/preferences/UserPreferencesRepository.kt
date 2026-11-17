@@ -45,7 +45,8 @@ data class ScannerSettings(
     val selectedIpKey: String = "",
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val freeProxyCountry: String = "US",
-    val freeProxyPortFilter: String = ""
+    val freeProxyPortFilter: String = "",
+    val autoRoutingEnabled: Boolean = true
 )
 
 class UserPreferencesRepository(private val context: Context) {
@@ -69,6 +70,7 @@ class UserPreferencesRepository(private val context: Context) {
         val APP_LANGUAGE = stringPreferencesKey("app_language")
         val FREEPROXY_COUNTRY = stringPreferencesKey("freeproxy_country")
         val FREEPROXY_PORT_FILTER = stringPreferencesKey("freeproxy_port_filter")
+        val AUTO_ROUTING_ENABLED = booleanPreferencesKey("auto_routing_enabled")
     }
 
     private fun readSettings(prefs: Preferences): ScannerSettings {
@@ -98,7 +100,8 @@ class UserPreferencesRepository(private val context: Context) {
             selectedIpKey = prefs[Keys.SELECTED_IP_KEY] ?: "",
             appLanguage = AppLanguage.fromName(prefs[Keys.APP_LANGUAGE] ?: AppLanguage.SYSTEM.name),
             freeProxyCountry = prefs[Keys.FREEPROXY_COUNTRY] ?: "US",
-            freeProxyPortFilter = prefs[Keys.FREEPROXY_PORT_FILTER] ?: ""
+            freeProxyPortFilter = prefs[Keys.FREEPROXY_PORT_FILTER] ?: "",
+            autoRoutingEnabled = prefs[Keys.AUTO_ROUTING_ENABLED] ?: true
         )
     }
 
@@ -128,6 +131,7 @@ class UserPreferencesRepository(private val context: Context) {
             prefs[Keys.APP_LANGUAGE] = updated.appLanguage.name
             prefs[Keys.FREEPROXY_COUNTRY] = updated.freeProxyCountry
             prefs[Keys.FREEPROXY_PORT_FILTER] = updated.freeProxyPortFilter
+            prefs[Keys.AUTO_ROUTING_ENABLED] = updated.autoRoutingEnabled
         }
     }
 }

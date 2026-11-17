@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.IBinder
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
@@ -15,11 +16,24 @@ import com.example.data.local.CleanIpEntity
 import com.example.data.preferences.AppLanguage
 import com.example.data.preferences.ScannerSettings
 import com.example.data.repository.MlmRepository
+import com.example.psiphon.AdaptiveRouteDecision
+import com.example.psiphon.AdaptiveRoutingEngine
+import com.example.psiphon.AdaptiveRoutingService
+import com.example.psiphon.BackupDecryptionException
 import com.example.psiphon.CdnProvider
+import com.example.psiphon.CloudflareDiagnosticEngine
+import com.example.psiphon.CloudflareDiagnosticState
+import com.example.psiphon.CloudflareEdgeNode
+import com.example.psiphon.EncryptedProxyBackup
 import com.example.psiphon.FreeProxyWorldSource
+import com.example.psiphon.IntelligenceSummary
+import com.example.psiphon.InvalidBackupFormatException
+import com.example.psiphon.InvalidPassphraseException
+import com.example.psiphon.MultiProxySources
 import com.example.psiphon.ProbeTelemetry
 import com.example.psiphon.ProxyScrapeSource
 import com.example.psiphon.PsiphonCleanIps
+import com.example.psiphon.PsiphonIntelligenceEngine
 import com.example.psiphon.PsiphonMethod
 import com.example.psiphon.PsiphonProbeService
 import com.example.psiphon.PsiphonProbes
@@ -28,10 +42,13 @@ import com.example.psiphon.ScanStage
 import com.example.psiphon.ScanTarget
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -39,7 +56,10 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -63,15 +83,27 @@ class ScannerViewModel(
     private val _liveResults = MutableStateFlow<List<ProbeTelemetry>>(emptyList())
     val liveResults: StateFlow<List<ProbeTelemetry>> = _liveResults.asStateFlow()
 
+    private val _aiSummary = MutableStateFlow(IntelligenceSummary())
+    val aiSummary: StateFlow<IntelligenceSummary> = _aiSummary.asStateFlow()
+
     private val _importedServerEntries = MutableStateFlow<List<String>>(emptyList())
     val importedServerEntries: StateFlow<List<String>> = _importedServerEntries.asStateFlow()
+
+    private val _cfDiagState = MutableStateFlow(CloudflareDiagnosticState())
+    val cfDiagState: StateFlow<CloudflareDiagnosticState> = _cfDiagState.asStateFlow()
+
+    private val _adaptiveDecision = MutableStateFlow(AdaptiveRouteDecision())
+    val adaptiveDecision: StateFlow<AdaptiveRouteDecision> = _adaptiveDecision.asStateFlow()
 
     private val _snackbarEvents = MutableSharedFlow<String>()
     val snackbarEvents: SharedFlow<String> = _snackbarEvents.asSharedFlow()
 
+    private val intelligenceEngine = PsiphonIntelligenceEngine()
     private val fallbackProber = PsiphonProbes()
     private var boundService: PsiphonProbeService? = null
+    private var boundRoutingService: AdaptiveRoutingService? = null
     private var scanJob: Job? = null
+    private var cfDiagJob: Job? = null
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -84,13 +116,43 @@ class ScannerViewModel(
         }
     }
 
+    private val routingServiceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as? AdaptiveRoutingService.LocalBinder
+            boundRoutingService = binder?.getService()
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            boundRoutingService = null
+        }
+    }
+
     init {
         val intent = Intent(appContext, PsiphonProbeService::class.java)
         appContext.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        val routingIntent = Intent(appContext, AdaptiveRoutingService::class.java)
+        appContext.bindService(routingIntent, routingServiceConnection, Context.BIND_AUTO_CREATE)
         viewModelScope.launch {
             val loaded = repository.scannerSettings.first()
             if (!hasLocalSettingsEdit) {
                 _settings.value = loaded
+            }
+        }
+        viewModelScope.launch {
+            combine(
+                repository.savedCleanIps,
+                _cfDiagState,
+                _settings.map { it.autoRoutingEnabled to it.selectedIpKey }.distinctUntilChanged()
+            ) { saved, cfState, (autoEnabled, selectedKey) ->
+                Triple(saved, cfState, autoEnabled to selectedKey)
+            }.collect { (saved, cfState, routingFlags) ->
+                val (autoEnabled, selectedKey) = routingFlags
+                applyAdaptiveRoutingEvaluation(
+                    candidates = saved,
+                    cfState = cfState,
+                    autoEnabled = autoEnabled,
+                    selectedKey = selectedKey
+                )
             }
         }
     }
@@ -122,6 +184,21 @@ class ScannerViewModel(
             (currentSet - cdns).ifEmpty { setOf(CdnProvider.AKAMAI) }
         } else {
             currentSet + cdns
+        }
+        current.copy(
+            provider = nextSet.first(),
+            selectedProviders = nextSet
+        )
+    }
+
+    fun toggleAllProxySources() = updateSettings { current ->
+        val proxies = CdnProvider.proxyListSources.toSet()
+        val currentSet = current.selectedProviders.ifEmpty { setOf(current.provider) }
+        val allProxiesSelected = proxies.all { it in currentSet }
+        val nextSet = if (allProxiesSelected) {
+            (currentSet - proxies).ifEmpty { setOf(CdnProvider.AKAMAI) }
+        } else {
+            currentSet + proxies
         }
         current.copy(
             provider = nextSet.first(),
@@ -186,14 +263,72 @@ class ScannerViewModel(
         updateSettings { it.copy(freeProxyPortFilter = port.filter(Char::isDigit).take(5)) }
 
     fun resetSelectedIp() {
-        updateSettings { it.copy(selectedIpKey = "") }
+        updateSettings { it.copy(selectedIpKey = "", autoRoutingEnabled = true) }
+        evaluateAdaptiveRouteNow(emitFeedback = false)
         emitString(R.string.msg_reset_auto)
     }
 
     fun selectCleanIp(idKey: String) {
-        updateSettings { it.copy(selectedIpKey = idKey) }
+        updateSettings { it.copy(selectedIpKey = idKey, autoRoutingEnabled = false) }
         val displayEndpoint = idKey.removeSuffix(":HTTP").removeSuffix(":SOCKS5")
         emitString(R.string.msg_selected_ip, displayEndpoint)
+    }
+
+    fun toggleAutoRouting() {
+        val next = !_settings.value.autoRoutingEnabled
+        updateSettings { it.copy(autoRoutingEnabled = next) }
+        if (next) {
+            evaluateAdaptiveRouteNow(emitFeedback = true)
+        } else {
+            emitString(R.string.adaptive_msg_manual_mode)
+        }
+    }
+
+    fun evaluateAdaptiveRouteNow(emitFeedback: Boolean = true) {
+        viewModelScope.launch {
+            val saved = repository.savedCleanIps.first()
+            val current = _settings.value
+            val decision = applyAdaptiveRoutingEvaluation(
+                candidates = saved,
+                cfState = _cfDiagState.value,
+                autoEnabled = true,
+                selectedKey = current.selectedIpKey
+            )
+            if (emitFeedback) {
+                val chosen = decision.selectedRoute
+                if (chosen != null) {
+                    emitString(
+                        R.string.adaptive_msg_routed,
+                        "${chosen.ip}:${chosen.targetPort}",
+                        chosen.anonymityConfidenceScore
+                    )
+                } else {
+                    emitString(R.string.adaptive_msg_no_routes)
+                }
+            }
+        }
+    }
+
+    private fun applyAdaptiveRoutingEvaluation(
+        candidates: List<CleanIpEntity>,
+        cfState: CloudflareDiagnosticState,
+        autoEnabled: Boolean,
+        selectedKey: String
+    ): AdaptiveRouteDecision {
+        val decision = boundRoutingService?.evaluateRoute(
+            candidates = candidates,
+            cfDiagState = cfState,
+            currentSelectedKey = selectedKey
+        ) ?: AdaptiveRoutingEngine.evaluateBestRoute(
+            candidates = candidates,
+            cfDiagState = cfState,
+            currentSelectedKey = selectedKey
+        )
+        _adaptiveDecision.value = decision
+        if (autoEnabled && decision.selectedRoute != null && decision.selectedIdKey != selectedKey) {
+            updateSettings { it.copy(selectedIpKey = decision.selectedIdKey) }
+        }
+        return decision
     }
 
     fun startScan() {
@@ -260,6 +395,31 @@ class ScannerViewModel(
                                         )
                                     }
                                 }
+                                CdnProvider.GEONODE,
+                                CdnProvider.THESPEEDX,
+                                CdnProvider.MONOSANS,
+                                CdnProvider.OPENPROXY -> {
+                                    val fetched = MultiProxySources.fetchCandidates(
+                                        provider = selectedProvider,
+                                        client = activeProber().sharedClient,
+                                        countryCode = currentSettings.freeProxyCountry,
+                                        portFilter = currentSettings.freeProxyPortFilter,
+                                        includeIpv4 = currentSettings.includeIpv4,
+                                        includeIpv6 = currentSettings.includeIpv6,
+                                        includeHttp = currentSettings.includeHttp,
+                                        includeSocks5 = currentSettings.includeSocks5,
+                                        limit = perProviderLimit
+                                    )
+                                    fetched.map {
+                                        ScanTarget(
+                                            ip = it.ip,
+                                            port = it.port,
+                                            countryHint = it.countryCode,
+                                            proxyProtocol = it.proxyType,
+                                            provider = it.provider
+                                        )
+                                    }
+                                }
                                 else -> {
                                     val candidates = PsiphonCleanIps.collectCandidates(
                                         provider = selectedProvider,
@@ -299,9 +459,10 @@ class ScannerViewModel(
                     emitString(R.string.msg_freeproxy_fetched, liveProxyCount)
                 }
 
-                // Interleave targets round-robin across providers so live stream shows every selected source
-                val targetPairs = interleaveBuckets(perProviderBuckets)
+                // Interleave across providers then prioritize via Neuro-Fuzzy + ANN + Game Theory Nash solver
+                val interleavedTargets = interleaveBuckets(perProviderBuckets)
                     .distinctBy { "${it.ip}:${it.port}:${it.proxyProtocol}:${it.provider.name}" }
+                val targetPairs = intelligenceEngine.prioritizeTargets(interleavedTargets)
 
                 if (targetPairs.isEmpty()) {
                     _scanProgress.value = ScanProgressState(
@@ -330,14 +491,17 @@ class ScannerViewModel(
                     timeoutMs = currentSettings.timeoutMs,
                     verifyTls = currentSettings.verifyTls,
                     verifyHttpsTunnel = currentSettings.verifyHttpsTunnel
-                ) { result ->
+                ) { rawResult ->
+                    val result = intelligenceEngine.evaluateAndLearn(rawResult, currentSettings.timeoutMs)
                     if (result.isClean || result.tcpPingMs != null) {
                         repository.saveProbeResult(result)
                     }
                     synchronized(lock) {
+                        _aiSummary.value = intelligenceEngine.snapshotSummary()
                         _liveResults.update { current ->
                             (listOf(result) + current).sortedWith(
                                 compareByDescending<ProbeTelemetry> { it.isClean }
+                                    .thenByDescending { it.aiScore }
                                     .thenBy { it.httpsPingMs ?: Long.MAX_VALUE }
                             )
                         }
@@ -388,7 +552,7 @@ class ScannerViewModel(
         val currentSettings = settings.value
         viewModelScope.launch {
             emitString(R.string.msg_rescanning_single, "${entity.ip}:${entity.targetPort}")
-            val result = activeProber().probeCandidate(
+            val rawResult = activeProber().probeCandidate(
                 ip = entity.ip,
                 targetPort = entity.targetPort,
                 localSocksPort = currentSettings.localSocksPort,
@@ -402,9 +566,11 @@ class ScannerViewModel(
                 verifyHttpsTunnel = currentSettings.verifyHttpsTunnel,
                 proxyProtocol = entity.proxyProtocol
             )
+            val result = intelligenceEngine.evaluateAndLearn(rawResult, currentSettings.timeoutMs)
+            _aiSummary.value = intelligenceEngine.snapshotSummary()
             repository.saveProbeResult(result)
             val pingLabel = result.httpsPingMs?.let { "${it}ms" } ?: (result.failureReason ?: "Failed")
-            emitMessage("${entity.countryFlag} ${entity.ip}:${entity.targetPort} -> $pingLabel")
+            emitMessage("${entity.countryFlag} ${entity.ip}:${entity.targetPort} -> $pingLabel (AI ${result.aiScore})")
         }
     }
 
@@ -420,7 +586,7 @@ class ScannerViewModel(
             )
             try {
                 list.forEach { entity ->
-                    val result = activeProber().probeCandidate(
+                    val rawResult = activeProber().probeCandidate(
                         ip = entity.ip,
                         targetPort = entity.targetPort,
                         localSocksPort = currentSettings.localSocksPort,
@@ -434,6 +600,8 @@ class ScannerViewModel(
                         verifyHttpsTunnel = currentSettings.verifyHttpsTunnel,
                         proxyProtocol = entity.proxyProtocol
                     )
+                    val result = intelligenceEngine.evaluateAndLearn(rawResult, currentSettings.timeoutMs)
+                    _aiSummary.value = intelligenceEngine.snapshotSummary()
                     repository.saveProbeResult(result)
                     _scanProgress.update { p ->
                         p.copy(
@@ -494,6 +662,107 @@ class ScannerViewModel(
         emitString(R.string.msg_loaded_server_entries, entries.size)
     }
 
+    suspend fun buildEncryptedBackupBytes(passphrase: String): ByteArray {
+        val currentSettings = _settings.value
+        val savedProxies = repository.getAllCleanIpsOnce()
+        return withContext(Dispatchers.Default) {
+            EncryptedProxyBackup.exportToEncryptedBytes(
+                settings = currentSettings,
+                proxies = savedProxies,
+                passphrase = passphrase
+            )
+        }
+    }
+
+    suspend fun restoreEncryptedBackupBytes(
+        rawBytes: ByteArray,
+        passphrase: String,
+        replaceExisting: Boolean
+    ): Int {
+        val restored = withContext(Dispatchers.Default) {
+            EncryptedProxyBackup.importFromEncryptedBytes(
+                rawBytes = rawBytes,
+                passphrase = passphrase
+            )
+        }
+        hasLocalSettingsEdit = true
+        _settings.update(restored.settingsRestorer)
+        repository.restoreBackup(
+            settingsTransform = restored.settingsRestorer,
+            entities = restored.restoredEntities,
+            replaceExisting = replaceExisting
+        )
+        return restored.restoredEntities.size
+    }
+
+    fun exportEncryptedBackupToUri(uri: Uri, passphrase: String) {
+        viewModelScope.launch {
+            try {
+                val encryptedBytes = buildEncryptedBackupBytes(passphrase)
+                val savedCount = repository.getAllCleanIpsOnce().size
+                withContext(Dispatchers.IO) {
+                    appContext.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(encryptedBytes)
+                        out.flush()
+                    } ?: throw IllegalStateException("Unable to open destination file")
+                }
+                emitString(R.string.backup_msg_exported, savedCount)
+            } catch (_: InvalidPassphraseException) {
+                emitString(R.string.backup_err_short_passphrase)
+            } catch (_: Exception) {
+                emitString(R.string.backup_err_export_failed)
+            }
+        }
+    }
+
+    fun importEncryptedBackupFromUri(
+        uri: Uri,
+        passphrase: String,
+        replaceExisting: Boolean
+    ) {
+        viewModelScope.launch {
+            try {
+                val rawBytes = withContext(Dispatchers.IO) {
+                    appContext.contentResolver.openInputStream(uri)?.use { input ->
+                        input.readBytes()
+                    } ?: throw IllegalStateException("Unable to read backup file")
+                }
+                val restoredCount = restoreEncryptedBackupBytes(
+                    rawBytes = rawBytes,
+                    passphrase = passphrase,
+                    replaceExisting = replaceExisting
+                )
+                emitString(R.string.backup_msg_imported, restoredCount)
+            } catch (_: InvalidPassphraseException) {
+                emitString(R.string.backup_err_short_passphrase)
+            } catch (_: BackupDecryptionException) {
+                emitString(R.string.backup_err_wrong_passphrase)
+            } catch (_: InvalidBackupFormatException) {
+                emitString(R.string.backup_err_invalid_file)
+            } catch (_: Exception) {
+                emitString(R.string.backup_err_import_failed)
+            }
+        }
+    }
+
+    fun readAndValidateBackupFile(uri: Uri, onValid: (Uri) -> Unit) {
+        viewModelScope.launch {
+            val isValid = withContext(Dispatchers.IO) {
+                try {
+                    val bytes = appContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    bytes != null && EncryptedProxyBackup.isValidBackupEnvelope(bytes)
+                } catch (_: Exception) {
+                    false
+                }
+            }
+            if (isValid) {
+                onValid(uri)
+            } else {
+                emitString(R.string.backup_err_invalid_file)
+            }
+        }
+    }
+
     private fun <T> interleaveBuckets(buckets: List<List<T>>): List<T> {
         if (buckets.isEmpty()) return emptyList()
         val maxLen = buckets.maxOfOrNull { it.size } ?: 0
@@ -512,6 +781,111 @@ class ScannerViewModel(
             .filter { it in 1..65535 }
             .distinct()
         return parsed.ifEmpty { listOf(443) }
+    }
+
+    fun toggleCfDiagNode(nodeId: String) {
+        _cfDiagState.update { state ->
+            val next = if (nodeId in state.selectedNodeIds) {
+                if (state.selectedNodeIds.size > 1) state.selectedNodeIds - nodeId else state.selectedNodeIds
+            } else {
+                state.selectedNodeIds + nodeId
+            }
+            state.copy(selectedNodeIds = next)
+        }
+    }
+
+    fun addCustomCfEdgeNode(rawIp: String): Boolean {
+        val cleanIp = rawIp.trim().trim('[', ']')
+        if (!CloudflareDiagnosticEngine.isValidEdgeIp(cleanIp)) {
+            emitString(R.string.cf_diag_invalid_ip)
+            return false
+        }
+        _cfDiagState.update { state ->
+            val existing = state.nodes.firstOrNull { it.ip == cleanIp }
+            if (existing != null) {
+                state.copy(selectedNodeIds = state.selectedNodeIds + existing.id)
+            } else {
+                val customNode = CloudflareEdgeNode(
+                    id = "cf_custom_${cleanIp.hashCode()}",
+                    ip = cleanIp,
+                    label = cleanIp,
+                    regionHint = "Custom Edge"
+                )
+                state.copy(
+                    nodes = state.nodes + customNode,
+                    selectedNodeIds = state.selectedNodeIds + customNode.id
+                )
+            }
+        }
+        return true
+    }
+
+    fun setCfDiagInterval(intervalMs: Long) {
+        _cfDiagState.update { it.copy(intervalMs = intervalMs.coerceIn(500L, 5000L)) }
+    }
+
+    fun clearCfDiagHistory() {
+        _cfDiagState.update {
+            it.copy(
+                totalSweeps = 0,
+                nodeStats = emptyMap()
+            )
+        }
+    }
+
+    fun runSingleCfDiagSweep() {
+        if (_cfDiagState.value.isRunning) return
+        viewModelScope.launch {
+            executeSingleCfSweep()
+        }
+    }
+
+    fun startCfDiagLive() {
+        if (_cfDiagState.value.isRunning) return
+        _cfDiagState.update { it.copy(isRunning = true) }
+        cfDiagJob = viewModelScope.launch {
+            try {
+                while (_cfDiagState.value.isRunning) {
+                    executeSingleCfSweep()
+                    delay(_cfDiagState.value.intervalMs)
+                }
+            } catch (_: CancellationException) {
+            } finally {
+                _cfDiagState.update { it.copy(isRunning = false) }
+            }
+        }
+    }
+
+    fun stopCfDiagLive() {
+        cfDiagJob?.cancel()
+        cfDiagJob = null
+        _cfDiagState.update { it.copy(isRunning = false) }
+    }
+
+    private suspend fun executeSingleCfSweep() {
+        val current = _cfDiagState.value
+        val activeNodes = current.nodes.filter { it.id in current.selectedNodeIds }
+            .ifEmpty { listOf(current.nodes.first()) }
+        val nextSweep = current.totalSweeps + 1
+        val samples = CloudflareDiagnosticEngine.measureNodesSweep(
+            nodes = activeNodes,
+            baseClient = activeProber().sharedClient,
+            sampleIndex = nextSweep,
+            timeoutMs = settings.value.timeoutMs.coerceIn(1000, 3500)
+        )
+        _cfDiagState.update { state ->
+            val updatedStats = state.nodeStats.toMutableMap()
+            samples.forEach { sample ->
+                val node = state.nodes.firstOrNull { it.id == sample.nodeId } ?: return@forEach
+                val prevSamples = updatedStats[node.id]?.samples.orEmpty()
+                val nextSamples = (prevSamples + sample).takeLast(CloudflareDiagnosticEngine.MAX_HISTORY_SAMPLES)
+                updatedStats[node.id] = CloudflareDiagnosticEngine.computeNodeStats(node, nextSamples)
+            }
+            state.copy(
+                totalSweeps = nextSweep,
+                nodeStats = updatedStats
+            )
+        }
     }
 
     fun notifyMessage(message: String) = emitMessage(message)
@@ -537,8 +911,13 @@ class ScannerViewModel(
 
     override fun onCleared() {
         scanJob?.cancel()
+        cfDiagJob?.cancel()
         try {
             appContext.unbindService(serviceConnection)
+        } catch (_: Exception) {
+        }
+        try {
+            appContext.unbindService(routingServiceConnection)
         } catch (_: Exception) {
         }
         super.onCleared()

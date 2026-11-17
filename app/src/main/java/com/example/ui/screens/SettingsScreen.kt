@@ -20,21 +20,28 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EnhancedEncryption
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -57,17 +64,29 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.preferences.AppLanguage
 import com.example.data.preferences.ScannerSettings
+import com.example.ui.components.rememberEncryptedBackupController
 import com.example.ui.theme.ElectricCyan
+import com.example.ui.theme.EmeraldShield
 
 @Composable
 fun SettingsScreen(
     settings: ScannerSettings,
     importedServerCount: Int,
+    savedProxyCount: Int,
     onUpdateSettings: ((ScannerSettings) -> ScannerSettings) -> Unit,
     onImportServerEntries: (String) -> Unit,
+    onExportEncryptedBackup: (Uri, String) -> Unit,
+    onValidateBackupFile: (Uri, (Uri) -> Unit) -> Unit,
+    onImportEncryptedBackup: (Uri, String, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val backupController = rememberEncryptedBackupController(
+        savedProxyCount = savedProxyCount,
+        onExportToUri = onExportEncryptedBackup,
+        onValidateBackupUri = onValidateBackupFile,
+        onImportFromUri = onImportEncryptedBackup
+    )
     var socksPortText by remember { mutableStateOf(settings.localSocksPort.toString()) }
     var hasEditedSocksPort by remember { mutableStateOf(false) }
     LaunchedEffect(settings.localSocksPort) {
@@ -275,6 +294,98 @@ fun SettingsScreen(
                             valueRange = 1500f..6000f,
                             steps = 8
                         )
+                    }
+                }
+            }
+        }
+
+        // Encrypted Proxy Backup & Restore (AES-256-GCM + SAF)
+        item {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                shape = MaterialTheme.shapes.large,
+                border = BorderStroke(1.dp, EmeraldShield.copy(alpha = 0.35f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.EnhancedEncryption,
+                                contentDescription = null,
+                                tint = EmeraldShield
+                            )
+                            Text(
+                                text = stringResource(R.string.backup_card_title),
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                        }
+                        Surface(
+                            color = EmeraldShield.copy(alpha = 0.14f),
+                            shape = RoundedCornerShape(999.dp),
+                            border = BorderStroke(1.dp, EmeraldShield.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = stringResource(R.string.backup_cipher_badge),
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = EmeraldShield,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = stringResource(R.string.backup_card_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = stringResource(R.string.backup_saved_summary, savedProxyCount),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = ElectricCyan
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { backupController.launchExport() },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = EmeraldShield,
+                                contentColor = Color.White
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("settings_export_encrypted_button")
+                        ) {
+                            Icon(Icons.Filled.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(stringResource(R.string.backup_btn_export), fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { backupController.launchImport() },
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("settings_import_encrypted_button")
+                        ) {
+                            Icon(Icons.Filled.LockOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(stringResource(R.string.backup_btn_import), fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
             }

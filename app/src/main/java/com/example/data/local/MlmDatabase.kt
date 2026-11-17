@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [CleanIpEntity::class],
-    version = 4,
+    version = 7,
     exportSchema = false
 )
 abstract class MlmDatabase : RoomDatabase() {

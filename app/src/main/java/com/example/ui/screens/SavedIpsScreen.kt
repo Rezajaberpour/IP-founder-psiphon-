@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -23,6 +24,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.EnhancedEncryption
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Speed
@@ -66,9 +69,12 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.local.CleanIpEntity
 import com.example.psiphon.PsiphonRegions
+import com.example.ui.components.AiScoreBadge
+import com.example.ui.components.AnonymityConfidenceBadge
 import com.example.ui.components.IpVersionBadge
 import com.example.ui.components.PingBadge
 import com.example.ui.components.ProtocolBadge
+import com.example.ui.components.rememberEncryptedBackupController
 import com.example.ui.theme.CoralError
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.EmeraldShield
@@ -86,11 +92,20 @@ fun SavedIpsScreen(
     onDeleteIp: (String) -> Unit,
     onClearAll: () -> Unit,
     onCopyFeedback: (String) -> Unit,
+    onExportEncryptedBackup: (Uri, String) -> Unit,
+    onValidateBackupFile: (Uri, (Uri) -> Unit) -> Unit,
+    onImportEncryptedBackup: (Uri, String, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     val activeLocale = LocalConfiguration.current.locales[0] ?: Locale.ENGLISH
+    val backupController = rememberEncryptedBackupController(
+        savedProxyCount = savedIps.size,
+        onExportToUri = onExportEncryptedBackup,
+        onValidateBackupUri = onValidateBackupFile,
+        onImportFromUri = onImportEncryptedBackup
+    )
     var searchQuery by remember { mutableStateOf("") }
     var filterMode by remember { mutableStateOf("CLEAN") } // ALL, CLEAN, HTTP, SOCKS5, IPV4, IPV6
     var portFilterInput by remember { mutableStateOf("") }
@@ -130,6 +145,8 @@ fun SavedIpsScreen(
                 entry.countryName.contains(searchQuery, ignoreCase = true) ||
                 localizedCountry.contains(searchQuery, ignoreCase = true) ||
                 entry.countryCode.contains(searchQuery, ignoreCase = true) ||
+                entry.city.contains(searchQuery, ignoreCase = true) ||
+                entry.isp.contains(searchQuery, ignoreCase = true) ||
                 entry.provider.contains(searchQuery, ignoreCase = true)
             matchesFilter && matchesPort && matchesSearch
         }
@@ -232,6 +249,60 @@ fun SavedIpsScreen(
                         Icon(
                             Icons.Filled.DeleteSweep,
                             contentDescription = stringResource(R.string.cd_clear_all_saved)
+                        )
+                    }
+                }
+
+                // Encrypted Backup / Restore Row (AES-256-GCM)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { backupController.launchExport() },
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, EmeraldShield.copy(alpha = 0.55f)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("saved_export_encrypted_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.EnhancedEncryption,
+                            contentDescription = null,
+                            tint = EmeraldShield,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.backup_btn_export),
+                            color = EmeraldShield,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = { backupController.launchImport() },
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.55f)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("saved_import_encrypted_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.LockOpen,
+                            contentDescription = null,
+                            tint = ElectricCyan,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.backup_btn_import),
+                            color = ElectricCyan,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -394,6 +465,8 @@ fun SavedIpsScreen(
                         ) {
                             IpVersionBadge(entry.ipVersion)
                             ProtocolBadge(entry.proxyProtocol)
+                            AiScoreBadge(aiScore = entry.aiScore, aiVerdict = entry.aiVerdict)
+                            AnonymityConfidenceBadge(confidenceScore = entry.anonymityConfidenceScore)
                             if (isSelected) {
                                 Icon(
                                     imageVector = Icons.Filled.CheckCircle,

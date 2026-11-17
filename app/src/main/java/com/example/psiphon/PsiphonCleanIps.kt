@@ -239,7 +239,11 @@ object PsiphonCleanIps {
                 if (includeIpv6) dnsFallbackV6.forEach { pool.add(it) }
             }
             CdnProvider.FREEPROXY_WORLD,
-            CdnProvider.PROXYSCRAPE -> {
+            CdnProvider.PROXYSCRAPE,
+            CdnProvider.GEONODE,
+            CdnProvider.THESPEEDX,
+            CdnProvider.MONOSANS,
+            CdnProvider.OPENPROXY -> {
                 // Fetched asynchronously with port/country/type metadata via dedicated sources
             }
             CdnProvider.CUSTOM -> {

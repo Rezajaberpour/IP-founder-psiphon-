@@ -25,12 +25,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
@@ -43,8 +45,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -75,12 +79,18 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.local.CleanIpEntity
 import com.example.data.preferences.ScannerSettings
+import com.example.psiphon.AdaptiveRouteDecision
+import com.example.psiphon.AdaptiveRouteReason
 import com.example.psiphon.CdnProvider
 import com.example.psiphon.FreeProxyWorldSource
+import com.example.psiphon.IntelligenceSummary
 import com.example.psiphon.ProbeTelemetry
 import com.example.psiphon.PsiphonMethod
 import com.example.psiphon.PsiphonRegions
 import com.example.psiphon.ScanProgressState
+import com.example.psiphon.ScanStage
+import com.example.ui.components.AiScoreBadge
+import com.example.ui.components.AnonymityConfidenceBadge
 import com.example.ui.components.IpVersionBadge
 import com.example.ui.components.PingBadge
 import com.example.ui.components.ProtocolBadge
@@ -90,6 +100,7 @@ import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.EmeraldShield
 import com.example.ui.theme.ObsidianBg
 import com.example.ui.theme.PsiphonCrimson
+import com.example.ui.theme.VioletStudio
 import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -98,9 +109,12 @@ fun ScanScreen(
     settings: ScannerSettings,
     progress: ScanProgressState,
     liveResults: List<ProbeTelemetry>,
+    aiSummary: IntelligenceSummary,
+    adaptiveDecision: AdaptiveRouteDecision,
     selectedEntity: CleanIpEntity?,
     onToggleProvider: (CdnProvider) -> Unit,
     onToggleAllCdns: () -> Unit,
+    onToggleAllProxies: () -> Unit,
     onSelectMethod: (PsiphonMethod) -> Unit,
     onSelectFreeProxyCountry: (String) -> Unit,
     onSelectFreeProxyPort: (String) -> Unit,
@@ -108,6 +122,8 @@ fun ScanScreen(
     onToggleIpv6: () -> Unit,
     onToggleHttp: () -> Unit,
     onToggleSocks5: () -> Unit,
+    onToggleAutoRouting: () -> Unit,
+    onEvaluateAdaptiveRoute: () -> Unit,
     onUpdateSettings: ((ScannerSettings) -> ScannerSettings) -> Unit,
     onStartScan: () -> Unit,
     onStopScan: () -> Unit,
@@ -279,7 +295,7 @@ fun ScanScreen(
                                     }
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
@@ -288,7 +304,14 @@ fun ScanScreen(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .padding(end = 8.dp)
+                                                .padding(end = 4.dp)
+                                        )
+                                        AiScoreBadge(
+                                            aiScore = selectedEntity.aiScore,
+                                            aiVerdict = selectedEntity.aiVerdict
+                                        )
+                                        AnonymityConfidenceBadge(
+                                            confidenceScore = selectedEntity.anonymityConfidenceScore
                                         )
                                         PingBadge(pingMs = selectedEntity.httpsPingMs, isClean = selectedEntity.isClean)
                                     }
@@ -345,6 +368,115 @@ fun ScanScreen(
                                     color = ElectricCyan
                                 )
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Adaptive Routing Service Status & Auto-Selection Card
+        item {
+            val reasonText = when (adaptiveDecision.reasonCode) {
+                AdaptiveRouteReason.OPTIMAL_CF_SYNERGY -> stringResource(R.string.adaptive_reason_cf_synergy)
+                AdaptiveRouteReason.CONGESTION_FAILOVER -> stringResource(R.string.adaptive_reason_congestion)
+                AdaptiveRouteReason.ANONYMITY_PRIORITY -> stringResource(R.string.adaptive_reason_anonymity)
+                AdaptiveRouteReason.HOLD_HYSTERESIS -> stringResource(R.string.adaptive_reason_hysteresis)
+                AdaptiveRouteReason.NO_CLEAN_ROUTES -> stringResource(R.string.adaptive_reason_none)
+            }
+            val cfMetricSummary = adaptiveDecision.cfReferenceRttMs?.let { rtt ->
+                "${adaptiveDecision.cfReferenceIp} (${rtt}ms • ${adaptiveDecision.cfReferenceColo})"
+            } ?: stringResource(R.string.adaptive_cf_idle)
+
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(
+                    1.dp,
+                    if (settings.autoRoutingEnabled) EmeraldShield.copy(alpha = 0.45f)
+                    else MaterialTheme.colorScheme.outlineVariant
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("adaptive_routing_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.AltRoute,
+                                contentDescription = null,
+                                tint = if (settings.autoRoutingEnabled) EmeraldShield else ElectricCyan,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = stringResource(R.string.adaptive_routing_title),
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                                )
+                                Text(
+                                    text = reasonText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (settings.autoRoutingEnabled) EmeraldShield
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = settings.autoRoutingEnabled,
+                            onCheckedChange = { onToggleAutoRouting() },
+                            modifier = Modifier.testTag("adaptive_routing_switch")
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TelemetryStatCard(
+                            label = stringResource(R.string.adaptive_stat_route_score),
+                            value = if (adaptiveDecision.selectedRoute != null) "${adaptiveDecision.compositeScore}/100" else "--",
+                            accent = EmeraldShield,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TelemetryStatCard(
+                            label = stringResource(R.string.adaptive_stat_cf_edge),
+                            value = adaptiveDecision.cfReferenceRttMs?.let { "$it ms" } ?: "--",
+                            accent = ElectricCyan,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = cfMetricSummary,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedButton(
+                            onClick = onEvaluateAdaptiveRoute,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.testTag("adaptive_route_now_button")
+                        ) {
+                            Text(
+                                text = stringResource(R.string.adaptive_btn_route_now),
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                            )
                         }
                     }
                 }
@@ -424,10 +556,35 @@ fun ScanScreen(
                         }
                     }
 
-                    Text(
-                        text = stringResource(R.string.section_proxy_sources),
-                        style = MaterialTheme.typography.titleSmall
-                    )
+                    val allProxiesSelected = CdnProvider.proxyListSources.all { it in activeProviders }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.section_proxy_sources),
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = allProxiesSelected,
+                            onClick = onToggleAllProxies,
+                            leadingIcon = if (allProxiesSelected) {
+                                { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null,
+                            label = {
+                                Text(
+                                    text = stringResource(R.string.btn_select_all_proxies),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            },
+                            shape = CircleShape,
+                            colors = pillChipColors,
+                            border = pillChipBorder,
+                            modifier = Modifier.testTag("cdn_chip_all_proxies")
+                        )
+                    }
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -782,6 +939,142 @@ fun ScanScreen(
                             modifier = Modifier.weight(1f)
                         )
                     }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                    // 7-Stage Pipeline Status Strip (CDN(7) -> Proxy(6) -> TLS -> Psiphon -> GeoIP -> Results -> Storage)
+                    val pipelineStages = listOf(
+                        R.string.pipeline_stage_cdn,
+                        R.string.pipeline_stage_proxy,
+                        R.string.pipeline_stage_tls,
+                        R.string.pipeline_stage_psiphon,
+                        R.string.pipeline_stage_geoip,
+                        R.string.pipeline_stage_results,
+                        R.string.pipeline_stage_storage
+                    )
+                    val activeStageIndex = when (progress.stage) {
+                        ScanStage.IDLE -> -1
+                        ScanStage.COLLECTING_IPS -> 1
+                        ScanStage.PROBING -> 4
+                        ScanStage.COMPLETED, ScanStage.STOPPED -> 6
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        pipelineStages.forEachIndexed { idx, labelRes ->
+                            val isActive = idx <= activeStageIndex
+                            Surface(
+                                color = if (isActive) ElectricCyan.copy(alpha = 0.16f)
+                                else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isActive) ElectricCyan.copy(alpha = 0.55f)
+                                    else MaterialTheme.colorScheme.outlineVariant
+                                )
+                            ) {
+                                Text(
+                                    text = stringResource(labelRes),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium
+                                    ),
+                                    color = if (isActive) ElectricCyan else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Hybrid Neuro-Fuzzy + ANN + Game Theory Nash Equilibrium Card
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, VioletStudio.copy(alpha = 0.35f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("hybrid_ai_card")
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Psychology,
+                                    contentDescription = null,
+                                    tint = VioletStudio,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = stringResource(R.string.ai_engine_title),
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = VioletStudio
+                                )
+                            }
+                            Text(
+                                text = stringResource(R.string.ai_engine_subtitle),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                TelemetryStatCard(
+                                    label = stringResource(R.string.ai_stat_avg_score),
+                                    value = if (aiSummary.samplesLearned > 0) "${aiSummary.avgAiScore}/100" else "--",
+                                    accent = EmeraldShield,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TelemetryStatCard(
+                                    label = stringResource(R.string.ai_stat_fuzzy_avg),
+                                    value = if (aiSummary.samplesLearned > 0) "${(aiSummary.avgFuzzyMembership * 100).toInt()}%" else "--",
+                                    accent = ElectricCyan,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                TelemetryStatCard(
+                                    label = stringResource(R.string.ai_stat_epoch),
+                                    value = "${aiSummary.samplesLearned}",
+                                    accent = VioletStudio,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TelemetryStatCard(
+                                    label = stringResource(R.string.ai_stat_nash_route),
+                                    value = aiSummary.nashBestProvider,
+                                    accent = PsiphonCrimson,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                TelemetryStatCard(
+                                    label = stringResource(R.string.ai_stat_anon_confidence),
+                                    value = if (aiSummary.samplesLearned > 0) "${aiSummary.avgAnonymityConfidence}%" else "--",
+                                    accent = EmeraldShield,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TelemetryStatCard(
+                                    label = stringResource(R.string.ai_stat_sugeno_health),
+                                    value = if (aiSummary.samplesLearned > 0) "${aiSummary.avgProxyHealth}/100" else "--",
+                                    accent = ElectricCyan,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -884,6 +1177,8 @@ fun ScanScreen(
                         ) {
                             IpVersionBadge(result.ipVersion)
                             ProtocolBadge(result.proxyProtocol)
+                            AiScoreBadge(aiScore = result.aiScore, aiVerdict = result.aiVerdict)
+                            AnonymityConfidenceBadge(confidenceScore = result.anonymityConfidenceScore)
                             Text(
                                 text = if (result.isClean) {
                                     "$countryDisplayName • ${stringResource(result.provider.labelRes)} • ${result.tlsVersion}"

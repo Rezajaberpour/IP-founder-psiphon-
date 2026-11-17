@@ -13,11 +13,14 @@ import java.util.concurrent.ConcurrentHashMap
 data class GeoIpCountry(
     val code: String,
     val name: String,
-    val flag: String
+    val flag: String,
+    val city: String = "Unknown",
+    val isp: String = "Unknown"
 )
 
 object PsiphonRegions {
     private val cache = ConcurrentHashMap<String, GeoIpCountry>()
+    private val jsonParser = Json { ignoreUnknownKeys = true }
 
     val supportedRegions = listOf(
         "US", "DE", "NL", "GB", "CA", "FR", "CH", "SG", "JP",
@@ -39,40 +42,102 @@ object PsiphonRegions {
         return Locale("", clean).getDisplayCountry(locale).ifBlank { clean }
     }
 
-    fun unknownCountry(): GeoIpCountry = GeoIpCountry(
+    fun unknownCountry(
+        city: String = "Unknown",
+        isp: String = "Unknown"
+    ): GeoIpCountry = GeoIpCountry(
         code = "--",
         name = "Unknown",
-        flag = "🌐"
+        flag = "🌐",
+        city = city.ifBlank { "Unknown" },
+        isp = isp.ifBlank { "Unknown" }
     )
 
-    suspend fun lookupCountry(ip: String, client: OkHttpClient): GeoIpCountry =
-        withContext(Dispatchers.IO) {
-            val cleanIp = ip.trim().trim('[', ']')
-            cache[cleanIp]?.let { return@withContext it }
+    /**
+     * Parses GeoIP JSON payloads from ipwho.is (country_code, city, connection.isp/org)
+     * or api.country.is (country) into a normalized GeoIpCountry model.
+     */
+    fun parseGeoIpJson(body: String, fallbackIsp: String = "Unknown"): GeoIpCountry? {
+        if (body.isBlank()) return null
+        return try {
+            val obj = jsonParser.parseToJsonElement(body).jsonObject
+            val successProp = obj["success"]?.jsonPrimitive?.content
+            if (successProp == "false") return null
 
-            try {
-                val request = Request.Builder()
-                    .url("https://api.country.is/$cleanIp")
-                    .header("User-Agent", "ipfounder-psiphon/1.0")
-                    .build()
-                client.newCall(request).execute().use { resp ->
-                    if (!resp.isSuccessful) return@withContext unknownCountry()
-                    val body = resp.body?.string().orEmpty()
-                    val obj = Json.parseToJsonElement(body).jsonObject
-                    val code = obj["country"]?.jsonPrimitive?.content?.uppercase(Locale.US)
-                        ?: return@withContext unknownCountry()
-                    if (code.length != 2) return@withContext unknownCountry()
+            val rawCode = obj["country_code"]?.jsonPrimitive?.content
+                ?: obj["countryCode"]?.jsonPrimitive?.content
+                ?: obj["country"]?.jsonPrimitive?.content
+                ?: return null
+            val code = rawCode.trim().uppercase(Locale.US)
+            if (code.length != 2 || !code.all { it in 'A'..'Z' }) return null
 
-                    val resolved = GeoIpCountry(
-                        code = code,
-                        name = resolveDisplayName(code),
-                        flag = countryCodeToFlag(code)
-                    )
-                    cache[cleanIp] = resolved
-                    resolved
-                }
-            } catch (_: Exception) {
-                unknownCountry()
-            }
+            val rawCity = obj["city"]?.jsonPrimitive?.content?.trim().orEmpty()
+            val connObj = obj["connection"]?.jsonObject
+            val rawIsp = connObj?.get("isp")?.jsonPrimitive?.content?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: connObj?.get("org")?.jsonPrimitive?.content?.trim()?.takeIf { it.isNotBlank() }
+                ?: obj["isp"]?.jsonPrimitive?.content?.trim()?.takeIf { it.isNotBlank() }
+                ?: obj["org"]?.jsonPrimitive?.content?.trim()?.takeIf { it.isNotBlank() }
+                ?: fallbackIsp
+
+            GeoIpCountry(
+                code = code,
+                name = resolveDisplayName(code),
+                flag = countryCodeToFlag(code),
+                city = rawCity.ifBlank { "Unknown" },
+                isp = rawIsp.ifBlank { "Unknown" }
+            )
+        } catch (_: Exception) {
+            null
         }
+    }
+
+    suspend fun lookupCountry(
+        ip: String,
+        client: OkHttpClient,
+        fallbackIsp: String = "Unknown"
+    ): GeoIpCountry = withContext(Dispatchers.IO) {
+        val cleanIp = ip.trim().trim('[', ']')
+        cache[cleanIp]?.let { return@withContext it }
+
+        // Primary rich GeoIP lookup (Country + City + ISP) via ipwho.is
+        try {
+            val richReq = Request.Builder()
+                .url("https://ipwho.is/$cleanIp")
+                .header("User-Agent", "ipfounder-psiphon/1.0")
+                .build()
+            client.newCall(richReq).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string().orEmpty()
+                    val parsed = parseGeoIpJson(body, fallbackIsp)
+                    if (parsed != null) {
+                        cache[cleanIp] = parsed
+                        return@withContext parsed
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+
+        // Secondary Country fallback via api.country.is
+        try {
+            val req = Request.Builder()
+                .url("https://api.country.is/$cleanIp")
+                .header("User-Agent", "ipfounder-psiphon/1.0")
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string().orEmpty()
+                    val parsed = parseGeoIpJson(body, fallbackIsp)
+                    if (parsed != null) {
+                        cache[cleanIp] = parsed
+                        return@withContext parsed
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+
+        unknownCountry(isp = fallbackIsp)
+    }
 }

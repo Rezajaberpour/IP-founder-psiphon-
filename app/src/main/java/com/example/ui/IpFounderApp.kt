@@ -11,11 +11,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Radar
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.ShowChart
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -55,6 +59,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.R
 import com.example.ui.components.PsiphonIntroOverlay
+import com.example.ui.screens.CloudflareDiagScreen
+import com.example.ui.screens.GeoIpTableScreen
 import com.example.ui.screens.SavedIpsScreen
 import com.example.ui.screens.ScanScreen
 import com.example.ui.screens.SettingsScreen
@@ -66,6 +72,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable object ScanRoute
 @Serializable object SavedIpsRoute
+@Serializable object GeoIpRoute
+@Serializable object CfDiagRoute
 @Serializable object SettingsRoute
 
 private data class NavDestinationItem(
@@ -87,7 +95,10 @@ fun IpFounderApp(viewModel: ScannerViewModel) {
     val savedIps by viewModel.savedCleanIps.collectAsStateWithLifecycle()
     val progress by viewModel.scanProgress.collectAsStateWithLifecycle()
     val liveResults by viewModel.liveResults.collectAsStateWithLifecycle()
+    val aiSummary by viewModel.aiSummary.collectAsStateWithLifecycle()
     val importedServerEntries by viewModel.importedServerEntries.collectAsStateWithLifecycle()
+    val cfDiagState by viewModel.cfDiagState.collectAsStateWithLifecycle()
+    val adaptiveDecision by viewModel.adaptiveDecision.collectAsStateWithLifecycle()
 
     val selectedEntity = remember(savedIps, settings.selectedIpKey) {
         savedIps.firstOrNull { it.idKey == settings.selectedIpKey }
@@ -114,6 +125,20 @@ fun IpFounderApp(viewModel: ScannerViewModel) {
                 selectedIcon = Icons.Filled.Bookmark,
                 unselectedIcon = Icons.Outlined.BookmarkBorder,
                 testTag = "nav_tab_saved"
+            ),
+            NavDestinationItem(
+                route = GeoIpRoute,
+                labelRes = R.string.nav_geoip,
+                selectedIcon = Icons.Filled.Public,
+                unselectedIcon = Icons.Outlined.Public,
+                testTag = "nav_tab_geoip"
+            ),
+            NavDestinationItem(
+                route = CfDiagRoute,
+                labelRes = R.string.nav_cf_diag,
+                selectedIcon = Icons.Filled.ShowChart,
+                unselectedIcon = Icons.Outlined.ShowChart,
+                testTag = "nav_tab_cf_diag"
             ),
             NavDestinationItem(
                 route = SettingsRoute,
@@ -245,9 +270,12 @@ fun IpFounderApp(viewModel: ScannerViewModel) {
                                 settings = settings,
                                 progress = progress,
                                 liveResults = liveResults,
+                                aiSummary = aiSummary,
+                                adaptiveDecision = adaptiveDecision,
                                 selectedEntity = selectedEntity,
                                 onToggleProvider = viewModel::toggleProvider,
                                 onToggleAllCdns = viewModel::toggleAllRealScanCdns,
+                                onToggleAllProxies = viewModel::toggleAllProxySources,
                                 onSelectMethod = viewModel::setMethod,
                                 onSelectFreeProxyCountry = viewModel::setFreeProxyCountry,
                                 onSelectFreeProxyPort = viewModel::setFreeProxyPortFilter,
@@ -255,6 +283,8 @@ fun IpFounderApp(viewModel: ScannerViewModel) {
                                 onToggleIpv6 = viewModel::toggleIpv6,
                                 onToggleHttp = viewModel::toggleHttp,
                                 onToggleSocks5 = viewModel::toggleSocks5,
+                                onToggleAutoRouting = viewModel::toggleAutoRouting,
+                                onEvaluateAdaptiveRoute = { viewModel.evaluateAdaptiveRouteNow(emitFeedback = true) },
                                 onUpdateSettings = viewModel::updateSettings,
                                 onStartScan = viewModel::startScan,
                                 onStopScan = viewModel::stopScan,
@@ -274,15 +304,46 @@ fun IpFounderApp(viewModel: ScannerViewModel) {
                                 onRemoveFailed = viewModel::removeFailedIps,
                                 onDeleteIp = viewModel::deleteCleanIp,
                                 onClearAll = viewModel::clearAllSaved,
+                                onCopyFeedback = viewModel::notifyMessage,
+                                onExportEncryptedBackup = viewModel::exportEncryptedBackupToUri,
+                                onValidateBackupFile = viewModel::readAndValidateBackupFile,
+                                onImportEncryptedBackup = viewModel::importEncryptedBackupFromUri
+                            )
+                        }
+                        composable<GeoIpRoute> {
+                            GeoIpTableScreen(
+                                liveResults = liveResults,
+                                savedIps = savedIps,
+                                selectedIpKey = settings.selectedIpKey,
+                                onSelectIp = viewModel::selectCleanIp,
                                 onCopyFeedback = viewModel::notifyMessage
+                            )
+                        }
+                        composable<CfDiagRoute> {
+                            CloudflareDiagScreen(
+                                state = cfDiagState,
+                                adaptiveDecision = adaptiveDecision,
+                                autoRoutingEnabled = settings.autoRoutingEnabled,
+                                onToggleNode = viewModel::toggleCfDiagNode,
+                                onAddCustomEdge = viewModel::addCustomCfEdgeNode,
+                                onSetInterval = viewModel::setCfDiagInterval,
+                                onStartLive = viewModel::startCfDiagLive,
+                                onStopLive = viewModel::stopCfDiagLive,
+                                onSingleSweep = viewModel::runSingleCfDiagSweep,
+                                onClearHistory = viewModel::clearCfDiagHistory,
+                                onEvaluateAdaptiveRoute = { viewModel.evaluateAdaptiveRouteNow(emitFeedback = true) }
                             )
                         }
                         composable<SettingsRoute> {
                             SettingsScreen(
                                 settings = settings,
                                 importedServerCount = importedServerEntries.size,
+                                savedProxyCount = savedIps.size,
                                 onUpdateSettings = viewModel::updateSettings,
-                                onImportServerEntries = viewModel::importServerEntriesText
+                                onImportServerEntries = viewModel::importServerEntriesText,
+                                onExportEncryptedBackup = viewModel::exportEncryptedBackupToUri,
+                                onValidateBackupFile = viewModel::readAndValidateBackupFile,
+                                onImportEncryptedBackup = viewModel::importEncryptedBackupFromUri
                             )
                         }
                     }

@@ -74,6 +74,34 @@ enum class CdnProvider(
         description = "Live HTTP & SOCKS5 endpoints fetched from api.proxyscrape.com",
         isProxyListSource = true
     ),
+    GEONODE(
+        displayName = "GeoNode",
+        labelRes = R.string.provider_geonode,
+        defaultSni = "cloudflare-dns.com",
+        description = "Geo-tagged HTTP & SOCKS5 endpoints from proxylist.geonode.com API",
+        isProxyListSource = true
+    ),
+    THESPEEDX(
+        displayName = "TheSpeedX",
+        labelRes = R.string.provider_thespeedx,
+        defaultSni = "cloudflare-dns.com",
+        description = "Public HTTP & SOCKS5 feeds from TheSpeedX PROXY-List",
+        isProxyListSource = true
+    ),
+    MONOSANS(
+        displayName = "Monosans",
+        labelRes = R.string.provider_monosans,
+        defaultSni = "cloudflare-dns.com",
+        description = "Public verified HTTP & SOCKS5 proxy feeds from Monosans",
+        isProxyListSource = true
+    ),
+    OPENPROXY(
+        displayName = "OpenProxyList",
+        labelRes = R.string.provider_openproxy,
+        defaultSni = "cloudflare-dns.com",
+        description = "Live HTTP & SOCKS5 endpoints from OpenProxyList API",
+        isProxyListSource = true
+    ),
     DNS_ANYCAST(
         displayName = "DNS & Edge",
         labelRes = R.string.provider_dns_anycast,
@@ -193,6 +221,15 @@ data class ProbeTelemetry(
     val countryCode: String,
     val countryName: String,
     val countryFlag: String,
+    val city: String = "Unknown",
+    val isp: String = "Unknown",
     val isClean: Boolean,
-    val failureReason: String? = null
+    val failureReason: String? = null,
+    val aiScore: Int = 0, // 0..100 Hybrid Neuro-Fuzzy + ANN + Game Theory Choquet Fusion
+    val fuzzyMembership: Float = 0f, // ANFIS Layer-5 membership score 0f..1f
+    val nnPrediction: Float = 0f, // Online-adapted MLP ANN probability 0f..1f
+    val nashPayoff: Float = 0f, // Fictitious Play Mixed Nash Equilibrium strategic payoff 0f..1f
+    val anonymityConfidenceScore: Int = 0, // 0..100% Sugeno FIS + ANN-tuned MF Anonymity Confidence
+    val proxyHealthScore: Int = 0, // 0..100 Sugeno FIS Proxy Health Score
+    val aiVerdict: String = "MODERATE" // OPTIMAL, RESILIENT, MODERATE, RISKY
 )

@@ -2,6 +2,8 @@
     <string name="app_name">ipfounder psiphon</string>
     <string name="nav_scan">اسکنر</string>
     <string name="nav_saved">ذخیره‌شده‌ها</string>
+    <string name="nav_geoip">GeoIP</string>
+    <string name="nav_cf_diag">کلودفلر</string>
     <string name="nav_settings">تنظیمات</string>
     <string name="cd_header_backdrop">پس‌زمینه شبکه اسکن</string>
 
@@ -37,9 +39,10 @@
     <string name="probe_failed_fallback">تست ناموفق بود</string>
 
     <!-- CDN Providers & Scan Stages -->
-    <string name="section_cdn_sources">منابع CDN (اسکن واقعی Psiphon)</string>
-    <string name="section_proxy_sources">منابع پروکسی زنده</string>
+    <string name="section_cdn_sources">CDN Scanner (۷ منبع • اسکن واقعی Psiphon)</string>
+    <string name="section_proxy_sources">Proxy Scanner (۶ منبع زنده)</string>
     <string name="btn_select_all_cdns">همه CDNها</string>
+    <string name="btn_select_all_proxies">همه پروکسی‌ها</string>
     <string name="provider_akamai">Akamai</string>
     <string name="provider_fastly">Fastly</string>
     <string name="provider_cloudflare">Cloudflare</string>
@@ -50,21 +53,48 @@
     <string name="provider_dns_anycast">DNS و لبه</string>
     <string name="provider_freeproxy">Free Proxy World</string>
     <string name="provider_proxyscrape">ProxyScrape</string>
+    <string name="provider_geonode">GeoNode</string>
+    <string name="provider_thespeedx">TheSpeedX</string>
+    <string name="provider_monosans">Monosans</string>
+    <string name="provider_openproxy">OpenProxyList</string>
     <string name="provider_custom">دلخواه</string>
 
     <string name="stage_idle">آماده برای اسکن</string>
-    <string name="stage_collecting_ips">در حال جمع‌آوری IPv4/IPv6 و پروکسی‌های زنده…</string>
-    <string name="stage_probing">در حال تست TCP، گواهی TLS و تونل HTTPS…</string>
+    <string name="stage_collecting_ips">جمع‌آوری IP از ۷ منبع CDN و ۶ منبع پروکسی…</string>
+    <string name="stage_probing">تست TLS و گواهی • تونل سایفون • GeoIP • هوش عصبی-فازی…</string>
     <string name="stage_completed">اسکن تکمیل شد</string>
     <string name="stage_stopped">اسکن متوقف شد</string>
 
-    <!-- FreeProxy.world, ProxyScrape & Screenshot-matched Controls -->
+    <!-- Hybrid Neuro-Fuzzy + ANN + Game Theory AI & 7-Stage Pipeline -->
+    <string name="ai_engine_title">موتور ترکیبی شبکه عصبی، منطق فازی و نظریه بازی‌ها</string>
+    <string name="ai_engine_subtitle">سیستم فازی سوگنو (سلامت پروکسی) + تنظیم توابع عضویت با ANN (اعتماد ناشناسی) + تعادل نش</string>
+    <string name="ai_stat_epoch">نمونه آموزش ANN</string>
+    <string name="ai_stat_avg_score">امتیاز AI ترکیبی</string>
+    <string name="ai_stat_fuzzy_avg">عضویت فازی</string>
+    <string name="ai_stat_nash_route">استراتژی نش برتر</string>
+    <string name="ai_stat_anon_confidence">اعتماد ناشناسی</string>
+    <string name="ai_stat_sugeno_health">سلامت سوگنو</string>
+    <string name="anonymity_badge_format">ناشناسی %1$d%%</string>
+    <string name="ai_badge_format">AI %1$d • نش %2$s</string>
+    <string name="ai_tier_optimal">بهینه</string>
+    <string name="ai_tier_resilient">پایدار</string>
+    <string name="ai_tier_moderate">متوسط</string>
+    <string name="ai_tier_risky">ناپایدار</string>
+    <string name="pipeline_stage_cdn">CDN (۷)</string>
+    <string name="pipeline_stage_proxy">پروکسی (۶)</string>
+    <string name="pipeline_stage_tls">تست TLS</string>
+    <string name="pipeline_stage_psiphon">تونل سایفون</string>
+    <string name="pipeline_stage_geoip">GeoIP</string>
+    <string name="pipeline_stage_results">نتایج</string>
+    <string name="pipeline_stage_storage">ذخیره‌سازی</string>
+
+    <!-- FreeProxy.world, ProxyScrape & Multi-Proxy Controls -->
     <string name="freeproxy_country_label">کشور فیلتر منبع پروکسی</string>
     <string name="freeproxy_country_all">همه کشورها</string>
     <string name="freeproxy_port_label">فیلتر پورت منبع پروکسی</string>
     <string name="freeproxy_port_custom_label">پورت دلخواه</string>
     <string name="freeproxy_port_custom_placeholder">همه (مثلاً 1080)</string>
-    <string name="freeproxy_source_note">منابع زنده: Free Proxy World و ProxyScrape (فیلتر کشور، پروتکل و پورت)</string>
+    <string name="freeproxy_source_note">۶ منبع پروکسی زنده: FreeProxy.world، ProxyScrape، GeoNode، TheSpeedX، Monosans و OpenProxyList</string>
     <string name="btn_reset_to_auto">برگشت به خودکار</string>
     <string name="btn_add_more_ips">+ افزودن</string>
     <string name="btn_remove_failed">حذف خراب‌ها</string>
@@ -135,4 +165,83 @@
     <string name="msg_cleared_saved">تمام IPهای ذخیره‌شده پاک شد</string>
     <string name="msg_no_ips_in_file">هیچ آدرس IP در فایل انتخاب‌شده یافت نشد</string>
     <string name="msg_loaded_server_entries">%1$d آدرس IP در اسکنر دلخواه بارگذاری شد</string>
+
+    <!-- GeoIP Location Data Table -->
+    <string name="geoip_table_title">جدول موقعیت GeoIP و اعتماد ناشناسی</string>
+    <string name="geoip_table_subtitle">جست‌وجو و مرتب‌سازی IPها بر اساس کشور، شهر، ارائه‌دهنده اینترنت (ISP) و امتیاز اعتماد ناشناسی</string>
+    <string name="geoip_stat_endpoints">تعداد IP</string>
+    <string name="geoip_stat_countries">کشورها</string>
+    <string name="geoip_search_placeholder">جست‌وجوی IP، کشور، شهر یا ISP…</string>
+    <string name="cd_clear_search">پاک کردن جست‌وجو</string>
+    <string name="geoip_empty_title">موردی در جدول GeoIP یافت نشد</string>
+    <string name="geoip_empty_subtitle">اسکن را اجرا کنید یا فیلتر جست‌وجو را پاک کنید تا اطلاعات کشور، شهر، ISP و اعتماد ناشناسی نمایش داده شود.</string>
+    <string name="geoip_col_ip">IP / پروتکل</string>
+    <string name="geoip_col_country">کشور</string>
+    <string name="geoip_col_city">شهر</string>
+    <string name="geoip_col_isp">ISP / سازمان</string>
+    <string name="geoip_col_anonymity">ناشناسی</string>
+    <string name="geoip_col_ping">پینگ</string>
+
+    <!-- Cloudflare Real-Time RTT Diagnostic -->
+    <string name="cf_diag_title">عیب‌یاب لحظه‌ای لبه Cloudflare (RTT)</string>
+    <string name="cf_diag_subtitle">اندازه‌گیری واقعی زمان رفت‌وبرگشت (RTT) و کد PoP کلودفلر روی گره‌های لبه با نمودار زنده</string>
+    <string name="cf_stat_sweeps">تعداد تست</string>
+    <string name="cf_stat_avg_rtt">میانگین RTT</string>
+    <string name="cf_stat_fastest">سریع‌ترین</string>
+    <string name="cf_btn_start_live">شروع پینگ زنده</string>
+    <string name="cf_btn_stop_live">توقف</string>
+    <string name="cf_btn_ping_once">تست تک</string>
+    <string name="cd_clear_cf_history">پاک کردن تاریخچه RTT</string>
+    <string name="cf_interval_label">بازه:</string>
+    <string name="cf_graph_title">نمودار لحظه‌ای تأخیر RTT (میلی‌ثانیه)</string>
+    <string name="cf_graph_avg_ref">میانگین: %1$d ms</string>
+    <string name="cf_graph_empty">برای رسم نمودار لحظه‌ای RTT، دکمه شروع پینگ زنده یا تست تک را بزنید</string>
+    <string name="cf_tooltip_sample_header">جزئیات نمونه #%1$d</string>
+    <string name="cf_nodes_title">گره‌های لبه Cloudflare</string>
+    <string name="cf_custom_edge_label">آدرس IP دلخواه لبه</string>
+    <string name="cf_diag_invalid_ip">لطفاً یک IPv4 یا IPv6 معتبر کلودفلر وارد کنید</string>
+    <string name="cf_node_metrics_line">کمینه %1$s ms • میانگین %2$s ms • بیشینه %3$s ms • جیتر %4$s ms • افت %5$d%%</string>
+
+    <!-- Adaptive Routing Service -->
+    <string name="adaptive_routing_title">سرویس مسیریابی تطبیقی خودکار</string>
+    <string name="adaptive_stat_route_score">امتیاز مسیر</string>
+    <string name="adaptive_stat_cf_edge">RTT کلودفلر</string>
+    <string name="adaptive_btn_route_now">انتخاب مسیر</string>
+    <string name="adaptive_cf_idle">بدون تست لحظه‌ای CF • بر اساس اعتماد ناشناسی و پینگ</string>
+    <string name="adaptive_reason_cf_synergy">هم‌افزایی لبه کلودفلر • بهترین RTT و ناشناسی</string>
+    <string name="adaptive_reason_congestion">جابجایی خودکار در ازدحام • اولویت SOCKS5 و استتار</string>
+    <string name="adaptive_reason_anonymity">رتبه‌بندی بر اساس اعتماد ناشناسی و تأخیر</string>
+    <string name="adaptive_reason_hysteresis">حفظ مسیر فعلی (جلوگیری از نوسان مسیر)</string>
+    <string name="adaptive_reason_none">برای انتخاب تطبیقی ابتدا یک اسکن انجام دهید</string>
+    <string name="adaptive_msg_routed">مسیر تطبیقی انتخاب شد: %1$s (ناشناسی %2$d%%)</string>
+    <string name="adaptive_msg_manual_mode">حالت انتخاب دستی فعال شد (مسیریابی خودکار متوقف)</string>
+    <string name="adaptive_msg_no_routes">هنوز مسیر تمیزی برای مسیریابی وجود ندارد</string>
+
+    <!-- Encrypted Proxy Backup & Restore -->
+    <string name="backup_card_title">پشتیبان‌گیری رمزنگاری‌شده پروکسی‌ها</string>
+    <string name="backup_card_subtitle">خروجی گرفتن از پروکسی‌های ذخیره شده و تنظیمات اسکنر در فایل رمزنگاری‌شده AES-256-GCM (.ipfbak) یا بازیابی آن‌ها.</string>
+    <string name="backup_cipher_badge">AES-256-GCM • PBKDF2</string>
+    <string name="backup_saved_summary">%1$d پیکربندی پروکسی ذخیره‌شده و تنظیمات فعلی آماده رمزنگاری</string>
+    <string name="backup_btn_export">خروجی رمزنگاری‌شده</string>
+    <string name="backup_btn_import">بازیابی فایل رمزنگاری‌شده</string>
+    <string name="backup_export_dialog_title">رمزنگاری و ذخیره نسخه پشتیبان</string>
+    <string name="backup_export_dialog_body">یک رمز عبور برای رمزنگاری %1$d پیکربندی پروکسی و تنظیمات اسکنر با استاندارد AES-256-GCM وارد کنید.</string>
+    <string name="backup_import_dialog_title">رمزگشایی و بازیابی پشتیبان</string>
+    <string name="backup_import_dialog_body">فایل پشتیبان معتبر است (AES-256-GCM). برای رمزگشایی و بازیابی پیکربندی‌ها، رمز عبور را وارد کنید.</string>
+    <string name="backup_passphrase_label">رمز عبور پشتیبان</string>
+    <string name="backup_confirm_passphrase_label">تکرار رمز عبور</string>
+    <string name="backup_replace_existing_title">جایگزینی با پروکسی‌های فعلی</string>
+    <string name="backup_replace_existing_subtitle">خاموش: ادغام با لیست فعلی • روشن: جایگزینی کامل لیست</string>
+    <string name="backup_btn_choose_file">انتخاب محل ذخیره</string>
+    <string name="backup_btn_decrypt_restore">رمزگشایی و بازیابی</string>
+    <string name="backup_btn_cancel">انصراف</string>
+    <string name="cd_toggle_passphrase_visibility">نمایش یا مخفی کردن رمز عبور</string>
+    <string name="backup_err_short_passphrase">رمز عبور باید حداقل ۴ کاراکتر باشد</string>
+    <string name="backup_err_mismatch_passphrase">رمزهای عبور با هم مطابقت ندارند</string>
+    <string name="backup_err_wrong_passphrase">رمز عبور اشتباه است یا فایل پشتیبان آسیب دیده است</string>
+    <string name="backup_err_invalid_file">فایل انتخاب‌شده یک پشتیبان رمزنگاری‌شده معتبر (.ipfbak) نیست</string>
+    <string name="backup_err_export_failed">خطا در ذخیره فایل پشتیبان رمزنگاری‌شده</string>
+    <string name="backup_err_import_failed">خطا در خواندن یا بازیابی فایل پشتیبان</string>
+    <string name="backup_msg_exported">پشتیبان رمزنگاری‌شده ذخیره شد (%1$d پیکربندی)</string>
+    <string name="backup_msg_imported">%1$d پیکربندی پروکسی و تنظیمات بازیابی شد</string>
 </resources>

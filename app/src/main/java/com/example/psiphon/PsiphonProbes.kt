@@ -295,14 +295,23 @@ class PsiphonProbes {
             }
         }
 
-        // Step 4: GeoIP Country lookup (with countryHint fallback for FreeProxy.world)
-        val lookedUp = PsiphonRegions.lookupCountry(cleanIp, sharedClient)
+        // Step 4: GeoIP Country, City & ISP lookup (with countryHint & cert/provider fallback)
+        val fallbackIsp = certIssuer.takeIf {
+            it.isNotBlank() && it != "None" && it != "Verified"
+        } ?: provider.displayName
+        val lookedUp = PsiphonRegions.lookupCountry(
+            ip = cleanIp,
+            client = sharedClient,
+            fallbackIsp = fallbackIsp
+        )
         val country = if (lookedUp.code == "--" && !countryHint.isNullOrBlank() && countryHint.length == 2) {
             val code = countryHint.uppercase()
             GeoIpCountry(
                 code = code,
                 name = PsiphonRegions.resolveDisplayName(code),
-                flag = PsiphonRegions.countryCodeToFlag(code)
+                flag = PsiphonRegions.countryCodeToFlag(code),
+                city = lookedUp.city,
+                isp = lookedUp.isp
             )
         } else {
             lookedUp
@@ -331,6 +340,8 @@ class PsiphonProbes {
             countryCode = country.code,
             countryName = country.name,
             countryFlag = country.flag,
+            city = country.city,
+            isp = country.isp,
             isClean = passed,
             failureReason = if (!passed) httpsError else null
         )
